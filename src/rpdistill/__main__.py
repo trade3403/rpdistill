@@ -23,6 +23,7 @@ from .pipeline import CorpusPipeline
 from .student import contract as student_contract, checked_assets
 from .training_data import acquire_assets, batch_plan
 from .distill import DistillConfig, train_reviewed_snapshot
+from .resumable import ResumeConfig, train_reviewed_segment
 
 
 def runtime_info() -> dict[str, str]:
@@ -32,7 +33,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E5a",
+        "stage": "E6a",
     }
 
 
@@ -195,6 +196,28 @@ def parser() -> argparse.ArgumentParser:
     train.add_argument("--max-padded-tokens",type=int,default=4096)
     train.add_argument("--max-logits",type=int,default=16777216)
     train.add_argument("--limit",type=int,default=1000)
+    resume_train = commands.add_parser("student-train-resumable")
+    resume_train.add_argument("version")
+    resume_train.add_argument("--assets",required=True)
+    resume_train.add_argument("--output",required=True)
+    resume_train.add_argument("--reviewed-dataset",required=True,
+        help="Exact dataset version after operator review of content rights and translation quality")
+    resume_train.add_argument("--reviewed-teacher-license",required=True,
+        help="Registered teacher license after reviewing intended distillation rights")
+    resume_train.add_argument("--steps",type=int,default=20)
+    resume_train.add_argument("--batch-size",type=int,default=1)
+    resume_train.add_argument("--learning-rate",type=float,default=1e-4)
+    resume_train.add_argument("--weight-decay",type=float,default=0.01)
+    resume_train.add_argument("--max-grad-norm",type=float,default=1.0)
+    resume_train.add_argument("--seed",type=int,default=42)
+    resume_train.add_argument("--max-padded-tokens",type=int,default=4096)
+    resume_train.add_argument("--max-logits",type=int,default=16777216)
+    resume_train.add_argument("--limit",type=int,default=1000)
+    resume_train.add_argument("--accumulation",type=int,default=1)
+    resume_train.add_argument("--resume",help="Previous paused full-state checkpoint directory")
+    resume_train.add_argument("--run-steps",type=int,default=100)
+    resume_train.add_argument("--max-seconds",type=float,default=3600)
+    resume_train.add_argument("--max-checkpoint-bytes",type=int,default=1073741824)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -204,6 +227,16 @@ def main(argv=None) -> int:
     try:
         if args.command in (None, "info"):
             result = runtime_info()
+        elif args.command == "student-train-resumable":
+            config=ResumeConfig(DistillConfig(steps=args.steps,batch_size=args.batch_size,
+                learning_rate=args.learning_rate,weight_decay=args.weight_decay,
+                max_grad_norm=args.max_grad_norm,seed=args.seed,
+                max_padded_tokens=args.max_padded_tokens,max_logits=args.max_logits),
+                accumulation=args.accumulation)
+            result=train_reviewed_segment(args.db,args.version,args.assets,args.output,
+                reviewed_dataset=args.reviewed_dataset,reviewed_teacher_license=args.reviewed_teacher_license,
+                config=config,limit=args.limit,resume=args.resume,run_steps=args.run_steps,
+                max_seconds=args.max_seconds,max_checkpoint_bytes=args.max_checkpoint_bytes)
         elif args.command == "student-distill":
             config=DistillConfig(steps=args.steps,batch_size=args.batch_size,learning_rate=args.learning_rate,
                 weight_decay=args.weight_decay,max_grad_norm=args.max_grad_norm,seed=args.seed,

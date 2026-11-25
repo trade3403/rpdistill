@@ -39,7 +39,8 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E3.3b | 数据集候选版本与单次自动采集翻译调度 | 标准 CI 8/8 通过 |
 | E4a | D 线审计、Marian 学生架构及权重契约 | 标准 9/9 + Hub 2/2 CI 通过 |
 | E4b | 固定真实分词器、候选训练批次及损失掩码 | 标准 9/9 + tokenizer 1/1 CI 通过 |
-| E5a | 真实序列级蒸馏与权重检查点 | 已提交，待 CI |
+| E5a | 真实序列级蒸馏与权重检查点 | 标准 CI 9/9 success，真实 80 steps |
+| E6a | CPU 完整训练状态、梯度累积与分段续训 | 已提交，待 CI |
 | E3 后续 | 全文许可复核、下载、解析及语料生成 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -140,3 +141,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E4b 验收与 E5a
 提交 c7871527b66b78377eab4a019969f866fce06e8e：[标准 CI 45604907365](https://github.com/trade3403/rpdistill/actions/runs/45604907365) 9/9、[分词器 45604907414](https://github.com/trade3403/rpdistill/actions/runs/45604907414) 1/1 success。job 139173180582 下载 5 资产 3230522 bytes、10/10 三方 network IDs 一致、0 unknown rejection、未下载权重；job 139173180974 masked loss 3.4788079261779785、5 supervised tokens，与显式 CE 一致。E5a distill.py 新增 DistillConfig、真实 CPU FP32 AdamW/反传/梯度裁剪、确定性 shuffle/seed、token 加权 eval loss、SafeTensors 不覆盖检查点（权重、历史、来源、配置、哈希）及安全重载；student-distill CLI 要求操作者确认精确候选版本内容权利/质量与注册教师许可，使用 train split 且当前资格/哈希/分词通过、达到计数门槛。新增 3 个单元测试方法与真实 tiny CPU synthetic-target 80-step 训练 smoke（实际参数变化、loss 降低至少 50%、权重/ logits roundtrip、损坏及覆盖拒绝）；待 CI。未运行真实 Qwen 译文蒸馏或完整尺寸训练，无准确率声明。只权重 checkpoint，不保存优化器和 RNG，无精确续训；E6 添加真实 CUDA、资源预算、混合精度、积累、持久训练状态和精确恢复。自动触发仅在权利/质量授权及正式数据门槛完成后；无 logits/feature 蒸馏跨分词器假设。
+
+## E5a 验收与 E6a
+提交 33a5951d8c88180487b6feb12d270b9558c86883：[标准 CI 45606587882](https://github.com/trade3403/rpdistill/actions/runs/45606587882) 9/9 success，真实 job 139178917662：80 steps、43 tensors changed、初始 loss 3.482527494430542、最终 0.002275040838867426、checkpoint roundtrip true、corruption rejected true，synthetic token targets、quality_test=false、exact_resume=false。E6a resumable.py 新增 ResumeConfig、确定性 epoch 顺序/cursor、按有效目标 token 归一化梯度累积、AdamW 单步更新、完整 SafeTensors 权重+优化器 moments/step+CPU RNG，hash manifest/数据/配置/环境绑定、禁止覆盖、磁盘与单 checkpoint 字节预算、每段优化器步数与软时间门槛；review helper 复用，CLI student-train-resumable，需精确 dataset 与 teacher license review。新增 3 个单元测试方法与真实 CPU 7 steps 连续 vs 2+2+3 分段逐位全部状态和 history 对照，拒绝数据顺序变化与损坏。新 CI 待核验。边界：只同环境 CPU FP32，非 CUDA/AMP；只在调用结束保存（强杀可损失本段），无实时 RAM/VRAM/累计磁盘控制或持续 worker；E6b 增加 GPU、混合精度及持久调度/定期保存。历史 E5 权重 checkpoint 仍保留，不能当完整续训状态；新 checkpoint 不是 RPModel。真实翻译质量本机/E7。

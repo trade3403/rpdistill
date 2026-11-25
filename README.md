@@ -111,3 +111,7 @@ E4a 4250379 标准 CI 9/9、Hub 2/2 成功。`student-assets --root PATH --max-b
 
 ### E5a 序列级蒸馏（CPU FP32）
 E4b c787152 标准 CI 9/9、真实分词器 CI 1/1 通过：5 个固定资产共 3,230,522 bytes，10/10 三方 ID 一致；真实 masked loss 3.4788079261779785（合成样本，非质量指标）。E5a `student-distill VERSION --assets PATH --output NEW_DIR --reviewed-dataset VERSION --reviewed-teacher-license LICENSE --steps 20` 仅在操作者明确核查该版本内容权利、教师蒸馏权利及译文质量后使用，不能自动认定候选数据已认证。固定 Marian 学生随机初始化，train split only，CPU FP32 AdamW/交叉熵/反向传播/梯度裁剪/步数上限、实际损失历史、SafeTensors 权重检查点及 SHA256/严格形状复核。检查点只保存权重及训练记录，不保存 optimizer/RNG，不支持精确断点续训，不是 RPModel 部署包。CI 真实微型 CPU 权重更新、合成样本 loss 下降、权重与 logits roundtrip、损坏拒绝，待验收。正式 GPU、混合精度、梯度累积、精确续训、持久调度在 E6；真实教师译文质量与独立评测在本机/E7。无需下载大型权重。
+
+### E6a 同环境 CPU 精确续训与梯度累积
+E5a 33a5951 标准 CI 9/9 success，实际合成微型训练 80 steps、43 tensors changed、loss 3.482527494430542→0.002275040838867426，权重/ logits roundtrip 与损坏拒绝通过，非翻译质量指标。
+`student-train-resumable VERSION --assets PATH --output NEW_DIR --reviewed-dataset VERSION --reviewed-teacher-license LICENSE --steps 100 --run-steps 20 --accumulation 4` 保存优化器步边界的完整状态；用完全相同的数据/训练配置及本地运行环境、不同新输出目录、`--resume PREVIOUS_DIR` 继续。完整状态 SafeTensors 含 canonical weights、AdamW FP32 moments/step、CPU RNG；manifest 含数据哈希、软件/线程配置、epoch/cursor/history，强校验与不可覆盖；按监督 token 数加权梯度累积。`--max-seconds` 为每段软时间限制（初始化、步骤、保存可超过），`--max-checkpoint-bytes` 为单检查点文件预算，默认 1 GiB；预检约 3×权重加元数据上限，不是总内存或累计磁盘预算。单次命令结束才保存；进程强杀可能丢失本段，旧 checkpoint 保留。精确续训只在相同 CPU/软件/硬件环境下测试，不保证跨机器或 CUDA。新增实际 CPU 连续 7 steps 与 2+2+3 steps 恢复的逐位比较 smoke，待 CI。CUDA、AMP、定期自动保存、资源实时监测及统一持久调度在 E6b；训练权利和语义质量仍需明确复核，未执行真实 Qwen/GPU。新格式不属于 Rust 部署包。

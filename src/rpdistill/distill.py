@@ -201,13 +201,11 @@ def load_checkpoint(root):
     return model,manifest
 
 
-def train_reviewed_snapshot(db_path,version,assets,destination,*,reviewed_dataset,
-                            reviewed_teacher_license,config=DistillConfig(),limit=1000):
+def prepare_reviewed_snapshot(db_path,version,assets,*,reviewed_dataset,
+                              reviewed_teacher_license,limit=1000):
     """Explicit operator authorization required; review is asserted, not certified by software."""
     if reviewed_dataset!=version:
         raise ValueError("explicit review of exact dataset version required")
-    if Path(destination).exists() or Path(destination).is_symlink():
-        raise ValueError("checkpoint destination already exists")
     manifest=next((m for m in DatasetStore(db_path).list() if m["version"]==version),None)
     if manifest is None:
         raise KeyError("unknown dataset version")
@@ -230,6 +228,15 @@ def train_reviewed_snapshot(db_path,version,assets,destination,*,reviewed_datase
                 "training_pair_ids_sha256":hashlib.sha256(encoded([e["pair_id"] for e in examples]).encode()).hexdigest(),
                 "initialization":"random","method":"sequence-level teacher-target cross-entropy",
                 "quality_certified":False}
+    return examples,provenance
+
+
+def train_reviewed_snapshot(db_path,version,assets,destination,*,reviewed_dataset,
+                            reviewed_teacher_license,config=DistillConfig(),limit=1000):
+    if Path(destination).exists() or Path(destination).is_symlink():
+        raise ValueError("checkpoint destination already exists")
+    examples,provenance=prepare_reviewed_snapshot(db_path,version,assets,
+        reviewed_dataset=reviewed_dataset,reviewed_teacher_license=reviewed_teacher_license,limit=limit)
     model=build_student(FIXED,seed=config.seed)
     history=train_sequence(model,examples,config,FIXED)
     return save_checkpoint(model,FIXED,config,history,destination,provenance=provenance)

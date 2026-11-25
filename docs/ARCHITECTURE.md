@@ -52,3 +52,5 @@ E4a：student.py 固定 D 线 Marian 6+6/512/8/2048/65001 契约，PyTorch 训�
 E4b training_data.py：固定 tokenizer assets 下载与完整性；DatasetStore 不可变候选成员→当前全文/许可元数据/版本校验→StudentCodec→按 split 和 token/logits 预算组 batch，labels padding=-100、Marian decoder start PAD 保持 attention=1。训练计划不更新参数或认证数据；E5 接真实训练器。
 
 E5a distill.py：经过操作者明确复核的候选版本 train split→StudentCodec→masked batch→Marian CPU FP32→CE/AdamW/backprop/grad clipping→真实 loss history→不可覆盖 SafeTensors 权重检查点与哈希 manifest。加载严格校验 canonical tensors/alias、恢复权重并重现 logits。仅权重恢复，不是 optimizer/RNG 精确恢复或 Rust 部署格式；E6 继续完整训练状态。合成微型 CPU 真实训练 smoke 非真实翻译质量。
+
+E6a resumable.py：复用 reviewed snapshot 预检，确定性 epoch shuffle 与 cursor；microbatch loss 按有效目标 token 加权累积，优化器边界更新与持久 history；完整 SafeTensors state（权重/AdamW moments+step/CPU RNG）+ hash manifest 绑定数据、配置、环境、进度；不可覆盖并严格恢复。同 CPU 环境验收，调用末保存，软时间预算非硬限制；非 CUDA、非持续调度、非 RPModel。
