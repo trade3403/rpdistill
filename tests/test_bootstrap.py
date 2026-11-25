@@ -13,7 +13,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(__version__, "0.1.0")
 
     def test_runtime_info(self):
-        self.assertEqual(runtime_info()["stage"], "E6b2")
+        self.assertEqual(runtime_info()["stage"], "E7a")
 
     def test_cli(self):
         result = subprocess.run(

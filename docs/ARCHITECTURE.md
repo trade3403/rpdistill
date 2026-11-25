@@ -58,3 +58,5 @@ E6a resumable.py：复用 reviewed snapshot 预检，确定性 epoch shuffle 与
 E6b1：ResumeConfig 支持显式 cuda:N 与 FP32/FP16/BF16 autocast，FP32 master/AdamW；FP16 scaler 状态、CUDA RNG 与环境进入 checkpoint，原 CPU checkpoint config 兼容。CUDA 预检 free VRAM、步边界 peak allocated 软门槛，非硬显存限制。真实 GPU 本机 smoke 尚未执行；周期保存和持久 worker 在 E6b2。
 
 E6b2 TrainingQueue：已审核 dataset version → SQLite 训练 spec/事件、单 worker 原子认领 → 每段预留时间及磁盘预算 → run_segment（step boundary should_stop）→ 完整 checkpoint 哈希验证 → 原子登记 cursor → 自动继续或终态。失败/强杀保留已登记 checkpoint，recover 须确认旧 worker 退出，不采纳孤立文件，累计预留不退款。仅单数据库队列 worker，非全局资源锁或硬限制；常驻服务、完整采集审核触发后续整合。
+
+E7a evaluation.py：训练快照全量哈希→规范化精确源文与声明 DOI/PMCID 排除→独立参考 benchmark hash→外部 hypothesis ID 对齐→SacreBLEU zh BLEU/chrF 与科学字面/启发式指标→覆盖/指标门槛与哈希报告。人工参考权利为操作者声明，外部输出未认证，自动门槛不授权发布，真实学生推理及基线/人工评测后续。

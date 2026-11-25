@@ -65,3 +65,5 @@ E5a 真实 CPU 80 steps 与权重检查点 CI 9/9 通过（合成数据，非翻
 E6a CPU 精确续训 CI 9/9，176 张量位一致。E6b1 CUDA/AMP 与 GPU 状态保存已提交待 CI，实际 GPU 待本机；周期检查点与持久 worker 在 E6b2。
 
 E6b1 10/10 必需 CI success，GPU 本机验收待做。E6b2 持久训练队列/事件、周期完整 checkpoint、暂停/取消/恢复、累计保守预算已提交待 CI；正式数据审核触发、常驻调度、全局资源管理尚未完成。
+
+E6b2 标准 CI 9/9 success（真实 CPU 队列、3 checkpoints、176 states 一致）。E7a 独立参考评测集、BLEU/chrF、数字/术语/引用/公式字面检查与自动评分 gate 已提交待 CI；真实模型评测与人工质量认证后续。

@@ -25,6 +25,7 @@ from .training_data import acquire_assets, batch_plan
 from .distill import DistillConfig, train_reviewed_snapshot
 from .resumable import ResumeConfig, train_reviewed_segment
 from .training_queue import TrainingQueue
+from .evaluation import freeze_benchmark, evaluate, read_json, read_jsonl, write_new, QualityGate
 
 
 def runtime_info() -> dict[str, str]:
@@ -34,7 +35,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E6b2",
+        "stage": "E7a",
     }
 
 
@@ -259,6 +260,17 @@ def parser() -> argparse.ArgumentParser:
             cmd.add_argument("--worker-stopped",action="store_true")
         if action=="events":
             cmd.add_argument("--limit",type=int,default=100)
+    bench=commands.add_parser("benchmark-freeze")
+    bench.add_argument("version")
+    bench.add_argument("--input",required=True,help="Reviewed human-reference JSONL")
+    bench.add_argument("--review-note",required=True)
+    bench.add_argument("--output",required=True)
+    ev=commands.add_parser("benchmark-score")
+    ev.add_argument("--benchmark",required=True)
+    ev.add_argument("--hypotheses",required=True,help="JSONL id and hypothesis")
+    ev.add_argument("--label",default="external hypotheses")
+    ev.add_argument("--gate",help="Optional JSON object overriding default QualityGate")
+    ev.add_argument("--output",required=True)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -268,6 +280,15 @@ def main(argv=None) -> int:
     try:
         if args.command in (None, "info"):
             result = runtime_info()
+        elif args.command == "benchmark-freeze":
+            result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
+            path=write_new(args.output,result)
+            result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "benchmark-score":
+            gate=QualityGate(**read_json(args.gate)) if args.gate else QualityGate()
+            result=evaluate(args.db,read_json(args.benchmark),read_jsonl(args.hypotheses),gate=gate,label=args.label)
+            path=write_new(args.output,result)
+            result={k:v for k,v in result.items() if k!="details"}|{"path":path}
         elif args.command == "training-enqueue":
             config=ResumeConfig(DistillConfig(steps=args.steps,batch_size=args.batch_size,
                 learning_rate=args.learning_rate,weight_decay=args.weight_decay,
