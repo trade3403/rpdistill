@@ -34,10 +34,12 @@
 | E9b2 | 导出候选源权重、权利与质量复核、实际生成重放、Rust 诊断和独立集成凭据；生产入口协调见 PRODUCTION_INTEGRATION.md（未接入） |
 | E10a | 完整尺寸 Rust CPU 诊断性能基准：加载分段、Encoder、Decoder、KV cache、RSS、吞吐量 |
 | E10b | 固定 D 临时构建词表行并行实验、同源双构建 bitwise parity 和同机性能实测；生产采用须协调，不强制重写 PyTorch |
-| E11a | Electron/React/TypeScript 中文深色只读工作台、安全 IPC、真实状态与硬件快照、跨平台 build/启动 smoke |
+| E11a | Electron/React/TypeScript 中文深色只读工作台、安全 IPC、真实状态与硬件快照、Windows/macOS build/启动 smoke |
 | E11b | 模型搜索与下载中心、许可预算确认、下载任务控制 |
 | E11c | 科研语料、训练配置及任务控制、真实监控、自动流水线 |
-| E11d | 评测导出界面、安装与交互验收；远程训练管理需独立安全设计 |
-| E12 | 从自动检索到真实蒸馏与导出的无人值守端到端验收； 完整安装包、真实 GPU 蒸馏、质量及性能对照、综合发布验收 |
+| E11d | 评测导出界面、Windows/macOS 安装与交互验收；远程训练管理需独立安全设计 |
+| E12 | 从自动检索到真实蒸馏与导出的无人值守端到端验收； Windows/macOS 完整安装包、真实 GPU 蒸馏、质量及性能对照、综合发布验收 |
 
 每阶段提交独立测试与交接记录，CI 成功后再进入下一阶段。CPU CI 不能代替 GPU 训练实测。所有演示数据须明确标记，不虚报准确率。教师模型不预先锁死，使用前核查许可、评测效果与硬件预算。
+
+用户明确取消 Linux GUI：自本次提交起，E11/E12 桌面端只支持 Windows/macOS，Linux GUI 构建、启动、打包及发行不再作为要求；Linux Python/Rust CLI、后端及专项计算 CI 保留，不取消 Linux 训练能力。此前修复 b59ad53 的三平台 Desktop CI 45632934256 已成功，历史结果保留。新的 Desktop CI 矩阵 Windows/macOS 两项，分别保留真实 Electron 窗口/持久队列 IPC smoke（使用 scripts/studio_desktop_smoke.py，独立临时 DB、无 shell、无禁用沙箱），取消 Linux 专属 xvfb/SUID 配置。两平台真实启动尚待新 CI 验收，不能用历史 Linux 成功代替。未改变应用安全设置或后端 CI。后续安装包仅 Windows/macOS，真实 GPU 按硬件和后端可用性验收。

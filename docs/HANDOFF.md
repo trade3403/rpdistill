@@ -107,3 +107,5 @@ E10b 5cfa63992e39de8d62c1ecfddc51dea16965c263：标准 [45629087050](https://git
 下一次核验 exact head 的标准、Desktop 三平台工作流；未改变 Rust 专项路径则沿用 45629087039 成功结果。若失败先修，若全绿推进 E11b 固定命令白名单的模型搜索/下载入队及显式确认。实际上下文风险才输出交接 Prompt。
 
 E11a 387ef63：标准 CI 45631411922 10/10 success；desktop CI 45631412179 Windows/macOS build 成功，Linux build 成功但真实 Electron launch 失败（job 139265302242，Chromium SUID sandbox helper owner/mode 不符，SIGTRAP，应用尚未启动）。仅 CI Linux 临时 runner 设置 Electron chrome-sandbox root:root 4755 并断言权限，保留 sandbox 与真实持久队列 smoke，不使用 --no-sandbox、不修改应用安全设置。修复提交需重新核验 exact head 标准及 desktop CI，全部通过才进入 E11b；实际 Windows/macOS GUI 启动与安装包尚未验收。
+
+用户明确取消 Linux GUI：自本次提交起，E11/E12 桌面端只支持 Windows/macOS，Linux GUI 构建、启动、打包及发行不再作为要求；Linux Python/Rust CLI、后端及专项计算 CI 保留，不取消 Linux 训练能力。此前修复 b59ad53 的三平台 Desktop CI 45632934256 已成功，历史结果保留。新的 Desktop CI 矩阵 Windows/macOS 两项，分别保留真实 Electron 窗口/持久队列 IPC smoke（使用 scripts/studio_desktop_smoke.py，独立临时 DB、无 shell、无禁用沙箱），取消 Linux 专属 xvfb/SUID 配置。两平台真实启动尚待新 CI 验收，不能用历史 Linux 成功代替。未改变应用安全设置或后端 CI。后续安装包仅 Windows/macOS，真实 GPU 按硬件和后端可用性验收。

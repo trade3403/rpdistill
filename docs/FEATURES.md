@@ -87,3 +87,5 @@ E9b2 补充双外部 pin 交接校验、签发前权利及包再次核查、完�
 E9b2 11/11 CI success；E10a 完整尺寸 Rust CPU 分段性能剖析/缓存对照/峰值 RSS 已提交待 CI，实际优化 E10b。非生产加载或正式质量验收。
 
 E10b 11/11 CI success，词表投影实验同机合成生成加速 4.4–7.1%、诊断字节一致。E11a 只读桌面工作台、真实数据库/硬件状态、受限 IPC、跨平台构建与真实 Electron smoke 已提交待验收；任务控制和实时训练指标未接入。
+
+用户明确取消 Linux GUI：自本次提交起，E11/E12 桌面端只支持 Windows/macOS，Linux GUI 构建、启动、打包及发行不再作为要求；Linux Python/Rust CLI、后端及专项计算 CI 保留，不取消 Linux 训练能力。此前修复 b59ad53 的三平台 Desktop CI 45632934256 已成功，历史结果保留。新的 Desktop CI 矩阵 Windows/macOS 两项，分别保留真实 Electron 窗口/持久队列 IPC smoke（使用 scripts/studio_desktop_smoke.py，独立临时 DB、无 shell、无禁用沙箱），取消 Linux 专属 xvfb/SUID 配置。两平台真实启动尚待新 CI 验收，不能用历史 Linux 成功代替。未改变应用安全设置或后端 CI。后续安装包仅 Windows/macOS，真实 GPU 按硬件和后端可用性验收。
