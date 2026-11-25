@@ -11,6 +11,7 @@ from .devices import device_report
 from .tasks import TaskStore
 from .teachers import TeacherRegistry, search_teachers, download_teacher
 from dataclasses import asdict
+from .downloads import DownloadQueue
 
 
 def runtime_info() -> dict[str, str]:
@@ -20,7 +21,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E2.1",
+        "stage": "E2.2a",
     }
 
 
@@ -53,6 +54,19 @@ def parser() -> argparse.ArgumentParser:
                        help="License identifier after reviewing intended-use rights")
     fetch.add_argument("--max-bytes", type=int, required=True)
     fetch.add_argument("--cache-dir", default=str(Path.home() / ".rpdistill" / "hub"))
+    enqueue = commands.add_parser("download-enqueue")
+    enqueue.add_argument("model_id")
+    enqueue.add_argument("--revision", required=True)
+    enqueue.add_argument("--reviewed-license", required=True)
+    enqueue.add_argument("--max-bytes", type=int, required=True)
+    enqueue.add_argument("--cache-dir", default=str(Path.home() / ".rpdistill" / "hub"))
+    commands.add_parser("download-list")
+    commands.add_parser("download-run")
+    for action in ("show", "pause", "resume", "cancel", "recover"):
+        cmd = commands.add_parser("download-" + action)
+        cmd.add_argument("id")
+        if action == "recover":
+            cmd.add_argument("--worker-stopped", action="store_true")
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -64,6 +78,23 @@ def main(argv=None) -> int:
             result = runtime_info()
         elif args.command == "devices":
             result = device_report(args.path)
+        elif args.command.startswith("download-"):
+            queue = DownloadQueue(args.db)
+            action = args.command.removeprefix("download-")
+            if action == "enqueue":
+                result = queue.enqueue(args.model_id, args.revision,
+                    reviewed_license=args.reviewed_license, max_bytes=args.max_bytes,
+                    cache_dir=args.cache_dir)
+            elif action == "list":
+                result = queue.list()
+            elif action == "run":
+                result = queue.run_next()
+            elif action == "show":
+                result = queue.get(args.id)
+            elif action == "recover":
+                result = queue.recover(args.id, worker_stopped=args.worker_stopped)
+            else:
+                result = queue.control(args.id, action)
         elif args.command == "model-search":
             result = [asdict(x) for x in search_teachers(args.query, args.limit)]
         elif args.command == "model-list":

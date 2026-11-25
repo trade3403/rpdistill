@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath
 import re
 import shutil
 import sqlite3
+import time
 from contextlib import closing
 from itertools import islice
 
@@ -132,9 +133,11 @@ def plan_files(info, max_bytes):
     return selected
 
 
-def verify_snapshot(path, selected):
+def verify_snapshot(path, selected, *, checkpoint=None):
     manifest = []
     for name, (size, expected) in sorted(selected.items()):
+        if checkpoint is not None:
+            checkpoint()
         file = path.joinpath(*PurePosixPath(name).parts)
         if not file.is_file() or file.stat().st_size != size:
             raise ValueError(f"missing or truncated file: {name}")
@@ -147,9 +150,6 @@ def verify_snapshot(path, selected):
             raise ValueError(f"upstream hash mismatch: {name}")
         manifest.append({"name": name, "size": size, "sha256": actual,
                          "upstream_sha256_verified": expected is not None})
-    with (path / "config.json").open(encoding="utf-8") as stream:
-        if not isinstance(json.load(stream), dict):
-            raise ValueError("invalid model configuration")
     return manifest
 
 
@@ -177,8 +177,13 @@ class TeacherRegistry:
 
 
 def download_teacher(model_id, revision, *, reviewed_license, max_bytes, cache_dir,
-                     registry, api=None, downloader=None):
+                     registry, api=None, downloader=None, progress=None, checkpoint=None,
+                     retry_limit=2):
     model_id, revision = validate_id(model_id), validate_revision(revision)
+    if type(retry_limit) is not int or not 0 <= retry_limit <= 3:
+        raise ValueError("retry_limit must be between 0 and 3")
+    if checkpoint is not None:
+        checkpoint()
     if not isinstance(reviewed_license, str) or not reviewed_license.strip():
         raise ValueError("explicit license review is required")
     api = hub_client() if api is None else api
@@ -197,10 +202,46 @@ def download_teacher(model_id, revision, *, reviewed_license, max_bytes, cache_d
     if shutil.disk_usage(cache).free < sum(size for size, _ in selected.values()):
         raise ValueError("insufficient disk space for selected files")
     downloader = hub_download if downloader is None else downloader
-    path = Path(downloader(repo_id=model_id, revision=revision, cache_dir=cache,
-                           allow_patterns=list(selected), token=False,
-                           max_workers=2)).resolve()
-    if not path.is_relative_to(cache):
-        raise ValueError("snapshot is outside configured cache")
-    manifest = verify_snapshot(path, selected)
+    def fetch(names):
+        for attempt in range(retry_limit + 1):
+            if checkpoint is not None:
+                checkpoint()
+            try:
+                result = Path(downloader(repo_id=model_id, revision=revision,
+                    cache_dir=cache, allow_patterns=names, token=False,
+                    max_workers=2)).resolve()
+                if not result.is_relative_to(cache):
+                    raise ValueError("snapshot is outside configured cache")
+                return result
+            except Exception as exc:
+                response = getattr(exc, "response", None)
+                status = getattr(response, "status_code", None)
+                transient = status in (408, 429, 500, 502, 503, 504) or (
+                    status is None and isinstance(exc, (TimeoutError, ConnectionError)))
+                if not transient or attempt >= retry_limit:
+                    raise
+                time.sleep(min(2 ** attempt, 4))
+
+    if progress is None:
+        path = fetch(list(selected))
+        manifest = verify_snapshot(path, selected, checkpoint=checkpoint)
+    else:
+        total = sum(size for size, _ in selected.values())
+        done = 0
+        manifest = []
+        path = None
+        progress(0, total)
+        for name, metadata in sorted(selected.items()):
+            current = fetch([name])
+            if path is not None and current != path:
+                raise ValueError("snapshot location changed between files")
+            path = current
+            manifest.extend(verify_snapshot(path, {name: metadata}, checkpoint=checkpoint))
+            done += metadata[0]
+            progress(done, total)
+    if checkpoint is not None:
+        checkpoint()
+    with (path / "config.json").open(encoding="utf-8") as stream:
+        if not isinstance(json.load(stream), dict):
+            raise ValueError("invalid model configuration")
     return registry.put(teacher, path, manifest)
