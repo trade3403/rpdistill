@@ -32,4 +32,7 @@ python -m unittest discover -s tests -v
 一次设置，自动搜索论文、下载合法全文、教师翻译、清洗生成训练集、触发学生蒸馏、评测量化及导出。[自动化规范](docs/AUTOMATION.md)。支持单次和预先授权的持续增量运行。
 
 ## GUI 设计参考
-[全自动蒸馏控制中心设计稿与 E11 界面要求](docs/assets/README.md)（原始 PNG 待上传，非运行截图）。
+[全自动蒸馏控制中心设计稿与 E11 界面要求](docs/assets/README.md)（高清设计稿，非运行截图）。
+
+![RPDistill Studio 全自动蒸馏控制中心](docs/assets/rpdistill-auto-distill-dashboard.png)
+
