@@ -66,3 +66,4 @@ jobs:
       - run: python scripts/student_smoke.py
       - run: python scripts/distill_smoke.py
       - run: python scripts/resume_smoke.py
+      - run: python scripts/training_queue_smoke.py

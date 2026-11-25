@@ -41,7 +41,8 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E4b | 固定真实分词器、候选训练批次及损失掩码 | 标准 9/9 + tokenizer 1/1 CI 通过 |
 | E5a | 真实序列级蒸馏与权重检查点 | 标准 CI 9/9 success，真实 80 steps |
 | E6a | CPU 完整训练状态、梯度累积与分段续训 | 标准 CI 9/9，176 状态张量逐位一致 |
-| E6b1 | CUDA/AMP、GPU 训练状态及预算 | 已提交，待 CPU 回归和本机 GPU 验收 |
+| E6b1 | CUDA/AMP、GPU 训练状态及预算 | 标准 9/9 + tokenizer 1/1 success；真实 GPU 待本机 |
+| E6b2 | 持久化训练队列与周期完整检查点 | 已提交，待 CI |
 | E3 后续 | 全文许可复核、下载、解析及语料生成 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -148,3 +149,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E6a 验收及 E6b1
 提交 a3fedbadc863dd00f1a338cfa91e11e116f3a73f：[CI 45608461745](https://github.com/trade3403/rpdistill/actions/runs/45608461745) 9/9 success；job 139185411102 真实 CPU 7 steps、2 interruptions、accumulation 2、176 state tensors 位一致、history/optimizer/RNG 一致，改变数据及损坏拒绝；合成样本非翻译质量。E6b 分为 b1 CUDA/AMP 与 b2 持久调度/周期保存。b1 修改 resumable.py/student.py，显式 CUDA index、FP32/FP16/BF16、native BF16 检测、autocast/GradScaler、unscale 后裁剪、非有限失败、GPU RNG/scaler checkpoint、环境绑定，CPU 原 checkpoint manifest 格式兼容；CUDA free VRAM 预检与步边界 peak allocated 软预算，不是硬限制。新增配置测试、CPU 无 CUDA 拒绝、独立本机 scripts/cuda_smoke.py（真实 GPU 7-step 连续/恢复对照，未运行）。新标准 CI 与因 student.py 改动触发的 tokenizer parity 待验收。真实 GPU/AMP 运行仍待用户本机，不能凭 CPU CI 宣称 GPU 成功。E6b2 接持久化 worker、自动定期 checkpoint、累计磁盘/时间预算和暂停恢复，保留单段旧 checkpoint。正式训练数据仍需复核。原 D 仓库只读。
+
+## E6b1 验收与 E6b2
+提交 a91dd39f823f3c36ee34ce1ce1992d6fb57a9c07：[标准 CI 45610312760](https://github.com/trade3403/rpdistill/actions/runs/45610312760) 9/9、[tokenizer CI 45610312728](https://github.com/trade3403/rpdistill/actions/runs/45610312728) 1/1 success。真实 CUDA/AMP 尚未执行。E6b2 training_queue.py 新增 SQLite 训练任务与事件、单数据库单 worker 原子抢占、去重、按 segment 自动保存完整检查点并继续、optimizer-step pause/cancel、失败/中断控制、显式确认旧 worker 停止后 recover、先预留累计秒数和 checkpoint bytes（不退还）、校验已登记 checkpoint、历史保留；CLI training-enqueue/run/list/show/events/pause/resume/cancel/recover。修改 resumable.py 增加 should_stop 边界回调。5 个新单元测试和真实 CPU training_queue_smoke，验证暂停后重新打开数据库、继续到 5 steps、3 个 checkpoint、最终状态等于连续训练。新 CI 待验收。限额为保守预留及软边界，不是实际累计运行时间硬上限；无全局 GPU 锁、无常驻 worker、无自动清理、未接自动语料到正式训练的审核触发。强杀丢本段，未登记孤立文件不自动采纳。真实 Qwen/GPU 留本机，E7 独立评测。D 线只读，Europe PMC 授权暂缓。

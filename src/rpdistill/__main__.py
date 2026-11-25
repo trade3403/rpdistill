@@ -24,6 +24,7 @@ from .student import contract as student_contract, checked_assets
 from .training_data import acquire_assets, batch_plan
 from .distill import DistillConfig, train_reviewed_snapshot
 from .resumable import ResumeConfig, train_reviewed_segment
+from .training_queue import TrainingQueue
 
 
 def runtime_info() -> dict[str, str]:
@@ -33,7 +34,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E6b1",
+        "stage": "E6b2",
     }
 
 
@@ -221,6 +222,43 @@ def parser() -> argparse.ArgumentParser:
     resume_train.add_argument("--run-steps",type=int,default=100)
     resume_train.add_argument("--max-seconds",type=float,default=3600)
     resume_train.add_argument("--max-checkpoint-bytes",type=int,default=1073741824)
+    queue_train = commands.add_parser("training-enqueue")
+    queue_train.add_argument("version")
+    queue_train.add_argument("--assets",required=True)
+    queue_train.add_argument("--root",required=True)
+    queue_train.add_argument("--reviewed-dataset",required=True,
+        help="Exact dataset version after operator review of content rights and translation quality")
+    queue_train.add_argument("--reviewed-teacher-license",required=True,
+        help="Registered teacher license after reviewing intended distillation rights")
+    queue_train.add_argument("--steps",type=int,default=20)
+    queue_train.add_argument("--batch-size",type=int,default=1)
+    queue_train.add_argument("--learning-rate",type=float,default=1e-4)
+    queue_train.add_argument("--weight-decay",type=float,default=0.01)
+    queue_train.add_argument("--max-grad-norm",type=float,default=1.0)
+    queue_train.add_argument("--seed",type=int,default=42)
+    queue_train.add_argument("--max-padded-tokens",type=int,default=4096)
+    queue_train.add_argument("--max-logits",type=int,default=16777216)
+    queue_train.add_argument("--limit",type=int,default=1000)
+    queue_train.add_argument("--accumulation",type=int,default=1)
+    queue_train.add_argument("--device",default="cpu",help="cpu or explicit cuda:N")
+    queue_train.add_argument("--precision",choices=["float32","float16","bfloat16"],default="float32")
+    queue_train.add_argument("--cuda-budget-bytes",type=int,default=0)
+    queue_train.add_argument("--segment-steps",type=int,default=20)
+    queue_train.add_argument("--segment-seconds",type=int,default=300)
+    queue_train.add_argument("--max-checkpoint-bytes",type=int,default=1073741824)
+    queue_train.add_argument("--total-seconds",type=int,required=True)
+    queue_train.add_argument("--total-checkpoint-bytes",type=int,required=True)
+    qrun=commands.add_parser("training-run")
+    qrun.add_argument("--max-segments",type=int,default=1000)
+    qlist=commands.add_parser("training-list")
+    qlist.add_argument("--limit",type=int,default=100)
+    for action in ("show","events","pause","resume","cancel","recover"):
+        cmd=commands.add_parser("training-"+action)
+        cmd.add_argument("id")
+        if action=="recover":
+            cmd.add_argument("--worker-stopped",action="store_true")
+        if action=="events":
+            cmd.add_argument("--limit",type=int,default=100)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -230,6 +268,33 @@ def main(argv=None) -> int:
     try:
         if args.command in (None, "info"):
             result = runtime_info()
+        elif args.command == "training-enqueue":
+            config=ResumeConfig(DistillConfig(steps=args.steps,batch_size=args.batch_size,
+                learning_rate=args.learning_rate,weight_decay=args.weight_decay,
+                max_grad_norm=args.max_grad_norm,seed=args.seed,
+                max_padded_tokens=args.max_padded_tokens,max_logits=args.max_logits),
+                accumulation=args.accumulation,device=args.device,precision=args.precision,
+                cuda_budget_bytes=args.cuda_budget_bytes)
+            result=TrainingQueue(args.db).enqueue(args.version,args.assets,args.root,
+                reviewed_dataset=args.reviewed_dataset,reviewed_teacher_license=args.reviewed_teacher_license,
+                config=config,limit=args.limit,segment_steps=args.segment_steps,
+                segment_seconds=args.segment_seconds,total_seconds=args.total_seconds,
+                max_checkpoint_bytes=args.max_checkpoint_bytes,total_checkpoint_bytes=args.total_checkpoint_bytes)
+        elif args.command.startswith("training-"):
+            queue=TrainingQueue(args.db)
+            action=args.command.removeprefix("training-")
+            if action=="run":
+                result=queue.run_next(max_segments=args.max_segments)
+            elif action=="list":
+                result=queue.list(args.limit)
+            elif action=="show":
+                result=queue.get(args.id)
+            elif action=="events":
+                result=queue.events(args.id,args.limit)
+            elif action=="recover":
+                result=queue.recover(args.id,worker_stopped=args.worker_stopped)
+            else:
+                result=queue.control(args.id,action)
         elif args.command == "student-train-resumable":
             config=ResumeConfig(DistillConfig(steps=args.steps,batch_size=args.batch_size,
                 learning_rate=args.learning_rate,weight_decay=args.weight_decay,

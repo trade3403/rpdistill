@@ -63,3 +63,5 @@ E4b 标准与 tokenizer CI 10/10 success（10/10 真实分词 ID）。E5a 序列
 E5a 真实 CPU 80 steps 与权重检查点 CI 9/9 通过（合成数据，非翻译质量）。E6a 梯度累积、完整优化器/RNG 状态与同环境 CPU 分段恢复已提交待 CI；CUDA/AMP/定期调度及完整资源监控待后续。
 
 E6a CPU 精确续训 CI 9/9，176 张量位一致。E6b1 CUDA/AMP 与 GPU 状态保存已提交待 CI，实际 GPU 待本机；周期检查点与持久 worker 在 E6b2。
+
+E6b1 10/10 必需 CI success，GPU 本机验收待做。E6b2 持久训练队列/事件、周期完整 checkpoint、暂停/取消/恢复、累计保守预算已提交待 CI；正式数据审核触发、常驻调度、全局资源管理尚未完成。

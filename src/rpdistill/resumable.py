@@ -291,7 +291,8 @@ def restore(root,profile,config,examples,provenance,device=None):
 
 
 def run_segment(examples,destination,*,config=ResumeConfig(),profile=FIXED,provenance,
-                resume=None,run_steps=100,max_seconds=3600,max_checkpoint_bytes=2**30):
+                resume=None,run_steps=100,max_seconds=3600,max_checkpoint_bytes=2**30,
+                should_stop=None):
     """Train a bounded segment, atomically publish a complete state at a step boundary."""
     import torch
     if not isinstance(config,ResumeConfig) or not isinstance(profile,StudentProfile):
@@ -379,6 +380,9 @@ def run_segment(examples,destination,*,config=ResumeConfig(),profile=FIXED,prove
                         groups=epoch_groups(examples,profile,config,epoch)
                 if gpu and torch.cuda.max_memory_allocated(device)>config.cuda_budget_bytes:
                     reason="cuda_allocation_budget_boundary"
+                    break
+                if should_stop is not None and should_stop():
+                    reason="control_boundary"
                     break
                 if time.monotonic()-start>=max_seconds:
                     reason="time_budget_boundary"

@@ -56,3 +56,5 @@ E5a distill.py：经过操作者明确复核的候选版本 train split→Studen
 E6a resumable.py：复用 reviewed snapshot 预检，确定性 epoch shuffle 与 cursor；microbatch loss 按有效目标 token 加权累积，优化器边界更新与持久 history；完整 SafeTensors state（权重/AdamW moments+step/CPU RNG）+ hash manifest 绑定数据、配置、环境、进度；不可覆盖并严格恢复。同 CPU 环境验收，调用末保存，软时间预算非硬限制；非 CUDA、非持续调度、非 RPModel。
 
 E6b1：ResumeConfig 支持显式 cuda:N 与 FP32/FP16/BF16 autocast，FP32 master/AdamW；FP16 scaler 状态、CUDA RNG 与环境进入 checkpoint，原 CPU checkpoint config 兼容。CUDA 预检 free VRAM、步边界 peak allocated 软门槛，非硬显存限制。真实 GPU 本机 smoke 尚未执行；周期保存和持久 worker 在 E6b2。
+
+E6b2 TrainingQueue：已审核 dataset version → SQLite 训练 spec/事件、单 worker 原子认领 → 每段预留时间及磁盘预算 → run_segment（step boundary should_stop）→ 完整 checkpoint 哈希验证 → 原子登记 cursor → 自动继续或终态。失败/强杀保留已登记 checkpoint，recover 须确认旧 worker 退出，不采纳孤立文件，累计预留不退款。仅单数据库队列 worker，非全局资源锁或硬限制；常驻服务、完整采集审核触发后续整合。
