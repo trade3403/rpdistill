@@ -30,6 +30,10 @@ class DownloadQueue:
                 done_bytes INTEGER NOT NULL DEFAULT 0, total_bytes INTEGER,
                 rate REAL, eta REAL, error TEXT, updated TEXT NOT NULL,
                 created TEXT NOT NULL)""")
+            columns = {row[1] for row in db.execute('PRAGMA table_info(model_download_jobs)')}
+            for name, declaration in [('network_bytes', 'INTEGER'), ('network_rate', 'REAL')]:
+                if name not in columns:
+                    db.execute(f'ALTER TABLE model_download_jobs ADD COLUMN {name} {declaration}')
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=10)
@@ -133,10 +137,11 @@ class DownloadQueue:
                 return None
             job_id = row[0]
             db.execute("""UPDATE model_download_jobs SET state='running',done_bytes=0,
-                       total_bytes=NULL,rate=NULL,eta=NULL,error=NULL,updated=? WHERE id=?""",
+                       total_bytes=NULL,rate=NULL,eta=NULL,error=NULL,network_bytes=NULL,network_rate=NULL,updated=? WHERE id=?""",
                        (now(), job_id))
             spec = self._get(db, job_id)["spec"]
         source = spec.pop("source", "huggingface")
+        streaming = execute is None and source == 'huggingface'
         if execute is None:
             if source == "modelscope":
                 from .modelscope_source import download_modelscope
@@ -166,10 +171,33 @@ class DownloadQueue:
                 db.execute("""UPDATE model_download_jobs SET done_bytes=?,total_bytes=?,
                     rate=?,eta=?,updated=? WHERE id=?""", (done, total, rate, eta, now(), job_id))
 
+        last = time.monotonic()
+        received = 0
+        pending = 0
+
+        def transfer(delta):
+            nonlocal received, pending, last
+            if type(delta) is not int or delta <= 0:
+                raise ValueError('invalid payload byte increment')
+            received += delta
+            pending += delta
+            current = time.monotonic()
+            if current - last >= 0.5:
+                flush_transfer(current)
+
+        def flush_transfer(current):
+            nonlocal pending, last
+            with self._write() as db:
+                db.execute('UPDATE model_download_jobs SET network_bytes=?, network_rate=?, updated=? WHERE id=?',
+                           (received, pending / max(current-last, 0.001), now(), job_id))
+            pending = 0
+            last = current
+
         target, error = "succeeded", None
         try:
             execute(**spec, registry=TeacherRegistry(self.path, source=source),
-                    checkpoint=checkpoint, progress=progress)
+                    checkpoint=checkpoint, progress=progress,
+                    **({'transfer': transfer} if streaming else {}))
         except StopRequested:
             target = "interrupted"
         except KeyboardInterrupt:
@@ -177,6 +205,8 @@ class DownloadQueue:
         except Exception as exc:
             # Avoid recording URLs or credentials in the error string.
             target, error = "failed", type(exc).__name__
+        if streaming:
+            flush_transfer(time.monotonic())
         with self._write() as db:
             row = self._get(db, job_id)
             # Completion wins if a request arrives after the final checkpoint/registration.
@@ -186,6 +216,6 @@ class DownloadQueue:
             if target == "succeeded" and (row["total_bytes"] is None
                                            or row["done_bytes"] != row["total_bytes"]):
                 target, error = "failed", "IncompleteProgress"
-            db.execute("""UPDATE model_download_jobs SET state=?,error=?,rate=NULL,eta=NULL,
+            db.execute("""UPDATE model_download_jobs SET state=?,error=?,rate=NULL,eta=NULL,network_rate=NULL,
                        updated=? WHERE id=?""", (target, error, now(), job_id))
             return self._get(db, job_id)

@@ -5,7 +5,7 @@
 RPDistill 负责教师模型、语料、训练、评测和模型导出。RPTranslate 保持独立 Rust 推理，不依赖训练环境。
 
 ## 当前状态
-E2.2b1：E2.2a CPU CI 六环境已通过；新增 ModelScope 检索、版本查询、固定 SHA 下载、校验与独立注册（待 CI）。尚未完成真实在线模型或 GPU 训练验收。
+E2.2b2：E2.2b1 六环境 CPU CI 已通过；新增 Hugging Face 队列 HTTP 字节进度、Range 恢复与 SDK/联网 smoke（待验收）。尚无真实模型推理或 GPU 训练。
 
 ## 快速开始
 ```sh
@@ -66,3 +66,6 @@ python -m rpdistill model-revisions Qwen/Qwen3-0.6B
 python -m rpdistill model-list --source modelscope
 ``
 用实际完整 commit SHA、已核查的许可证和字节预算执行 model-download 或 download-enqueue，加 --source modelscope。只接收明确公开且每个选中文件具备上游 SHA-256 的模型；不能确认时拒绝下载，不自动降级到浮动分支。ModelScope 记录与 Hugging Face 隔离。当前模拟 SDK CI；实际在线响应、SDK 版本及网络速度需 E2.2b2 验证。仍使用文件级进度及 SDK 缓存，不是实时网络带宽。
+
+### E2.2b2 下载监控与联网验收
+Hugging Face 队列默认采用公开固定 revision HTTPS 逐块传输，network_bytes 为本次实际读取的响应体字节（不含缓存或恢复前的字节），network_rate 为最近更新窗口速率；done_bytes 仍为已校验文件字节。支持块间暂停和有上游 SHA-256 的部分文件 Range 恢复，服务器返回 200 时重新下载，不拼接错误范围。无上游哈希的部分文件重新下载。SDK 直接下载 CLI 与 ModelScope 暂保留文件级控制；不并行操作相同缓存目录。标准 CI 增加 SDK 安装/接口检查，独立 Public Hub live smoke 只下载 MIT GPT-2 的小 config（最多 64 KiB）及 ModelScope 查询，不下载权重。真实外网状态独立记录。

@@ -1,0 +1,29 @@
+name: Public Hub live smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/hub_smoke.py'
+      - 'src/rpdistill/transfer.py'
+      - 'src/rpdistill/teachers.py'
+      - 'src/rpdistill/modelscope_source.py'
+      - 'pyproject.toml'
+      - '.github/workflows/hub-live.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-hub:
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [hf, ms]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[hub,modelscope]'
+      - run: python scripts/hub_smoke.py ${{ matrix.source }}

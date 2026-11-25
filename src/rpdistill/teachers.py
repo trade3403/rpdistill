@@ -184,7 +184,7 @@ class TeacherRegistry:
 
 def download_teacher(model_id, revision, *, reviewed_license, max_bytes, cache_dir,
                      registry, api=None, downloader=None, progress=None, checkpoint=None,
-                     retry_limit=2):
+                     retry_limit=2, transfer=None):
     model_id, revision = validate_id(model_id), validate_revision(revision)
     if type(retry_limit) is not int or not 0 <= retry_limit <= 3:
         raise ValueError("retry_limit must be between 0 and 3")
@@ -207,6 +207,7 @@ def download_teacher(model_id, revision, *, reviewed_license, max_bytes, cache_d
     cache.mkdir(parents=True, exist_ok=True)
     if shutil.disk_usage(cache).free < sum(size for size, _ in selected.values()):
         raise ValueError("insufficient disk space for selected files")
+    streaming = transfer is not None and downloader is None
     downloader = hub_download if downloader is None else downloader
     def fetch(names):
         for attempt in range(retry_limit + 1):
@@ -228,7 +229,28 @@ def download_teacher(model_id, revision, *, reviewed_license, max_bytes, cache_d
                     raise
                 time.sleep(min(2 ** attempt, 4))
 
-    if progress is None:
+    if streaming:
+        from .transfer import transfer_file, hf_url
+        path = cache / 'rpdistill-http' / model_id / revision
+        path.mkdir(parents=True, exist_ok=True)
+        if not path.resolve().is_relative_to(cache):
+            raise ValueError('snapshot outside configured cache')
+        total = sum(size for size, _ in selected.values())
+        done = 0
+        manifest = []
+        if progress:
+            progress(0, total)
+        for name, (size, sha) in sorted(selected.items()):
+            dest = path.joinpath(*PurePosixPath(name).parts)
+            if not dest.resolve().is_relative_to(path.resolve()):
+                raise ValueError('file outside snapshot')
+            transfer_file(hf_url(model_id, revision, name), dest, size=size, sha256=sha,
+                          on_bytes=transfer, checkpoint=checkpoint)
+            manifest.extend(verify_snapshot(path, {name: (size, sha)}, checkpoint=checkpoint))
+            done += size
+            if progress:
+                progress(done, total)
+    elif progress is None:
         path = fetch(list(selected))
         manifest = verify_snapshot(path, selected, checkpoint=checkpoint)
     else:

@@ -38,3 +38,5 @@ E1.2 修复 CI 45581701119 已成功（6/6）。E2.1 可选 Hub 依赖安装方�
 E2.1 CI 45582334642 已通过 6/6；E2.2a 新增 downloads.py。队列单 worker，每次 download-run 执行一个任务；只在文件间响应控制，缓存复用由 SDK 提供，真实断点续传待联网验证。恢复异常退出必须确认旧 worker 停止；禁止同时直接下载同一缓存绕过队列。剩余 ModelScope、网络字节实时速度和后台调度待开发。
 
 E2.2a CI 45582666202 已成功。E2.2b1 使用独立 ModelScope SDK 可选依赖及来源注册表；下载仅接受公开、已审核许可、完整 SHA 和每文件上游 SHA-256。实时网络速度未实现，真实服务行为未验收。
+
+E2.2b1 CI 45585519890 已通过 6/6。E2.2b2 新增 Hugging Face 队列流式 HTTP 传输、网络计数和 Range 恢复；旧 SDK 直接下载和 ModelScope 保留文件级进度。请先核验标准 CI（6 环境 + SDK 安装）及独立 Public Hub live smoke。后者只测试小 config 与查询，不代表模型下载/推理通过。网络实测、ModelScope 字节进度与 streaming 队列专项测试仍需完善。真实大模型与 GPU 训练在用户电脑进行。

@@ -22,7 +22,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E2.2b1",
+        "stage": "E2.2b2",
     }
 
 
