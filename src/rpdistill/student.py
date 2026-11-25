@@ -110,7 +110,7 @@ def build_student(profile=FIXED, *, seed=42):
         normalize_before=False,normalize_embedding=False,add_final_layer_norm=False,
         max_length=p.positions,num_beams=4,bad_words_ids=[[p.pad]])
     with torch.random.fork_rng(devices=[]):
-        torch.manual_seed(seed)
+        torch.default_generator.manual_seed(seed)
         model=MarianMTModel(cfg)
     canonical_state(model,p)
     return model

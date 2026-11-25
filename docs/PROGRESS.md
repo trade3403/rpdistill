@@ -40,7 +40,8 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E4a | D 线审计、Marian 学生架构及权重契约 | 标准 9/9 + Hub 2/2 CI 通过 |
 | E4b | 固定真实分词器、候选训练批次及损失掩码 | 标准 9/9 + tokenizer 1/1 CI 通过 |
 | E5a | 真实序列级蒸馏与权重检查点 | 标准 CI 9/9 success，真实 80 steps |
-| E6a | CPU 完整训练状态、梯度累积与分段续训 | 已提交，待 CI |
+| E6a | CPU 完整训练状态、梯度累积与分段续训 | 标准 CI 9/9，176 状态张量逐位一致 |
+| E6b1 | CUDA/AMP、GPU 训练状态及预算 | 已提交，待 CPU 回归和本机 GPU 验收 |
 | E3 后续 | 全文许可复核、下载、解析及语料生成 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -144,3 +145,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E5a 验收与 E6a
 提交 33a5951d8c88180487b6feb12d270b9558c86883：[标准 CI 45606587882](https://github.com/trade3403/rpdistill/actions/runs/45606587882) 9/9 success，真实 job 139178917662：80 steps、43 tensors changed、初始 loss 3.482527494430542、最终 0.002275040838867426、checkpoint roundtrip true、corruption rejected true，synthetic token targets、quality_test=false、exact_resume=false。E6a resumable.py 新增 ResumeConfig、确定性 epoch 顺序/cursor、按有效目标 token 归一化梯度累积、AdamW 单步更新、完整 SafeTensors 权重+优化器 moments/step+CPU RNG，hash manifest/数据/配置/环境绑定、禁止覆盖、磁盘与单 checkpoint 字节预算、每段优化器步数与软时间门槛；review helper 复用，CLI student-train-resumable，需精确 dataset 与 teacher license review。新增 3 个单元测试方法与真实 CPU 7 steps 连续 vs 2+2+3 分段逐位全部状态和 history 对照，拒绝数据顺序变化与损坏。新 CI 待核验。边界：只同环境 CPU FP32，非 CUDA/AMP；只在调用结束保存（强杀可损失本段），无实时 RAM/VRAM/累计磁盘控制或持续 worker；E6b 增加 GPU、混合精度及持久调度/定期保存。历史 E5 权重 checkpoint 仍保留，不能当完整续训状态；新 checkpoint 不是 RPModel。真实翻译质量本机/E7。
+
+## E6a 验收及 E6b1
+提交 a3fedbadc863dd00f1a338cfa91e11e116f3a73f：[CI 45608461745](https://github.com/trade3403/rpdistill/actions/runs/45608461745) 9/9 success；job 139185411102 真实 CPU 7 steps、2 interruptions、accumulation 2、176 state tensors 位一致、history/optimizer/RNG 一致，改变数据及损坏拒绝；合成样本非翻译质量。E6b 分为 b1 CUDA/AMP 与 b2 持久调度/周期保存。b1 修改 resumable.py/student.py，显式 CUDA index、FP32/FP16/BF16、native BF16 检测、autocast/GradScaler、unscale 后裁剪、非有限失败、GPU RNG/scaler checkpoint、环境绑定，CPU 原 checkpoint manifest 格式兼容；CUDA free VRAM 预检与步边界 peak allocated 软预算，不是硬限制。新增配置测试、CPU 无 CUDA 拒绝、独立本机 scripts/cuda_smoke.py（真实 GPU 7-step 连续/恢复对照，未运行）。新标准 CI 与因 student.py 改动触发的 tokenizer parity 待验收。真实 GPU/AMP 运行仍待用户本机，不能凭 CPU CI 宣称 GPU 成功。E6b2 接持久化 worker、自动定期 checkpoint、累计磁盘/时间预算和暂停恢复，保留单段旧 checkpoint。正式训练数据仍需复核。原 D 仓库只读。

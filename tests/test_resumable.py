@@ -30,3 +30,17 @@ class ResumeTests(unittest.TestCase):
             dest.mkdir()
             with self.assertRaises(ValueError):
                 preflight(dest,P,required_bytes(P))
+
+    def test_device_precision_budget_validation(self):
+        from rpdistill.resumable import config_record
+        from dataclasses import asdict
+        for kw in (dict(device="cuda"),dict(device="cuda:0"),dict(precision="float16"),
+                   dict(cuda_budget_bytes=1),dict(device="cuda:0",cuda_budget_bytes=-1),
+                   dict(device="cuda:0",precision="int8",cuda_budget_bytes=1)):
+            with self.assertRaises(ValueError):
+                ResumeConfig(**kw)
+        cpu=ResumeConfig()
+        self.assertEqual(config_record(cpu),{"training":asdict(cpu.training),"accumulation":1})
+        gpu=ResumeConfig(device="cuda:0",precision="float16",cuda_budget_bytes=2**30)
+        self.assertEqual(config_record(gpu)["device"],"cuda:0")
+        self.assertEqual(config_record(gpu)["precision"],"float16")

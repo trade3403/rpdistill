@@ -33,7 +33,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E6a",
+        "stage": "E6b1",
     }
 
 
@@ -214,6 +214,9 @@ def parser() -> argparse.ArgumentParser:
     resume_train.add_argument("--max-logits",type=int,default=16777216)
     resume_train.add_argument("--limit",type=int,default=1000)
     resume_train.add_argument("--accumulation",type=int,default=1)
+    resume_train.add_argument("--device",default="cpu",help="cpu or explicit cuda:N")
+    resume_train.add_argument("--precision",choices=["float32","float16","bfloat16"],default="float32")
+    resume_train.add_argument("--cuda-budget-bytes",type=int,default=0)
     resume_train.add_argument("--resume",help="Previous paused full-state checkpoint directory")
     resume_train.add_argument("--run-steps",type=int,default=100)
     resume_train.add_argument("--max-seconds",type=float,default=3600)
@@ -232,7 +235,8 @@ def main(argv=None) -> int:
                 learning_rate=args.learning_rate,weight_decay=args.weight_decay,
                 max_grad_norm=args.max_grad_norm,seed=args.seed,
                 max_padded_tokens=args.max_padded_tokens,max_logits=args.max_logits),
-                accumulation=args.accumulation)
+                accumulation=args.accumulation,device=args.device,precision=args.precision,
+                cuda_budget_bytes=args.cuda_budget_bytes)
             result=train_reviewed_segment(args.db,args.version,args.assets,args.output,
                 reviewed_dataset=args.reviewed_dataset,reviewed_teacher_license=args.reviewed_teacher_license,
                 config=config,limit=args.limit,resume=args.resume,run_steps=args.run_steps,

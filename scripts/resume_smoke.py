@@ -46,3 +46,15 @@ with tempfile.TemporaryDirectory() as tmp:
     print(json.dumps({"steps":7,"interruptions":2,"accumulation":2,
           "equal_state_tensors":len(a),"history_equal":True,"optimizer_rng_equal":True,
           "changed_data_rejected":True,"corruption_rejected":True,"device":"cpu","quality_test":False}))
+
+# CPU runner must reject CUDA instead of silently running on CPU.
+from unittest.mock import patch
+from rpdistill.resumable import execution_device
+with patch("torch.cuda.is_available",return_value=False):
+    try:
+        execution_device(ResumeConfig(device="cuda:0",cuda_budget_bytes=2**30),p)
+    except ValueError as exc:
+        assert "no CPU fallback" in str(exc)
+    else:
+        raise AssertionError("unavailable CUDA silently accepted")
+print(json.dumps({"cuda_unavailable_rejected":True,"gpu_executed":False}))

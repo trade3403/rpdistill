@@ -61,3 +61,5 @@ E4a 标准与 Hub CI 11/11 success。E4b 固定分词器自动下载、训练数
 E4b 标准与 tokenizer CI 10/10 success（10/10 真实分词 ID）。E5a 序列级 CPU 蒸馏、权重更新、实际 loss 和安全权重检查点已提交待 CI；精确优化器/RNG 恢复、GPU 与正式质量认证待后续。
 
 E5a 真实 CPU 80 steps 与权重检查点 CI 9/9 通过（合成数据，非翻译质量）。E6a 梯度累积、完整优化器/RNG 状态与同环境 CPU 分段恢复已提交待 CI；CUDA/AMP/定期调度及完整资源监控待后续。
+
+E6a CPU 精确续训 CI 9/9，176 张量位一致。E6b1 CUDA/AMP 与 GPU 状态保存已提交待 CI，实际 GPU 待本机；周期检查点与持久 worker 在 E6b2。
