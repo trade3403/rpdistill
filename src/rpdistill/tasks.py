@@ -2,6 +2,8 @@
 
 This module records lifecycle state; it does not execute or suspend workers.
 """
+from __future__ import annotations
+
 from contextlib import closing, contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone

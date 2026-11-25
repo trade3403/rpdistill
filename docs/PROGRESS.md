@@ -72,3 +72,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E1.2 基础实现与测试策略
 新增 tasks.py（SQLite、配置持久化、原子状态转换、事件记录）、devices.py（只读硬件探测）、CLI create/list/show/events/devices。新增 10 个测试方法，总计 15 个；包括并发抢占、状态冲突、持久化、CLI 及模拟 GPU 探测。尚未确认本次 CI 结果。免费 GitHub 托管标准 CPU Runner 测试，不运行真实大模型和 GPU 训练；真实下载、训练、显存/性能验收使用用户自己的电脑。创建任务不代表启动训练，当前状态接口不控制真实 worker。
+
+## E1.2 CI 修复记录
+[首次运行 45581459305](https://github.com/trade3403/rpdistill/actions/runs/45581459305) 六个环境全部失败。已检查 macOS/Linux 日志：TaskStore.list 方法遮蔽内置 list，后续 events 返回类型注解在类定义时触发 TypeError，导致两个测试模块无法导入。四个设备测试在已查看日志中通过。修复：tasks.py 使用延迟注解求值（from __future__ import annotations），不改变任务接口或删除测试。重新运行原六环境 CI，全部通过后才能推进 E2；本次修复尚未验收。

@@ -30,3 +30,5 @@ E11 界面须参考 `docs/assets/rpdistill-auto-distill-dashboard.png` 与同目
 
 ## 测试环境
 GitHub 标准免费 CPU runner 用于轻量跨平台 CI；真实 GPU、大模型、长时间蒸馏测试使用用户自己的电脑。先提供可复现本地命令及真实验收报告模板。不在托管 runner 下载大模型或声称模拟 GPU 测试等于实际训练。
+
+E1.2 首次 CI 六环境失败，已修复 TaskStore 类型注解名称遮蔽问题；详见 PROGRESS.md。重新验证修复提交全部通过后才进入 E2。
