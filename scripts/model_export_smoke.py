@@ -16,10 +16,12 @@ from rpdistill.student import FIXED,build_student,canonical_state
 from rpdistill.distill import DistillConfig,train_sequence,save_checkpoint
 from rpdistill.training_data import acquire_assets,ASSET_BYTES
 from rpdistill.model_export import export_candidate,verify_package,REQUIRED_BYTES,PAYLOAD
+from rpdistill.rust_parity import rust_parity
 
 torch.set_num_threads(2)
 exe=Path(sys.argv[1]).resolve()
 official=Path(sys.argv[2]).resolve()
+bridge=Path(sys.argv[3]).resolve()
 with tempfile.TemporaryDirectory() as tmp:
     root=Path(tmp)
     assets=root/"assets"
@@ -62,6 +64,16 @@ with tempfile.TemporaryDirectory() as tmp:
             actual.update(chunk)
         assert proc.wait()==0
     assert count==PAYLOAD and actual.hexdigest()==expected.hexdigest()
+    parity=rust_parity(root/"candidate",expected_package_id=m["package_id"],executable=bridge)
+    assert parity["diagnostic_passed"] and len(parity["cases"])==2
+    assert all(r["greedy_match"] for r in parity["cases"])
+    for wrong_weight,wrong_checkpoint in (("0"*64,m["origin"]["checkpoint_id"]),
+                                          (m["files"]["weights.safetensors"]["sha256"],"0"*64)):
+        rejected_pin=subprocess.run([str(bridge),str(root/"candidate"),wrong_weight,wrong_checkpoint],
+                                    capture_output=True,timeout=180)
+        assert rejected_pin.returncode!=0 and not rejected_pin.stdout
+    print(json.dumps({"actual_rust_inference":True,"wrong_weight_and_checkpoint_pin_rejected":True,
+        "parity":parity}))
     # Current official package loader MUST reject the distinct package.
     rejected=subprocess.run([str(official),str(root/"candidate")],capture_output=True)
     assert rejected.returncode!=0,"official package loader accepted independent candidate"
@@ -83,4 +95,4 @@ with tempfile.TemporaryDirectory() as tmp:
         "canonical_tensors":256,"rust_roundtrip_bytes":count,"canonical_sha256":actual.hexdigest(),
         "weights_file_bytes":m["files"]["weights.safetensors"]["bytes"],
         "external_pin_rejected":True,"corruption_rejected":True,"official_loader_rejected":True,
-        "rust_raw_reader_parity":True,"rust_model_inference":False,"release_ready":False}))
+        "rust_raw_reader_parity":True,"rust_model_inference":True,"release_ready":False}))

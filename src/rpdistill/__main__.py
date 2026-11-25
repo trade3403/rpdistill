@@ -31,6 +31,7 @@ from .quality_review import leakage_audit, create_blind_review, collect_review, 
 from .compression import plan as compression_plan, create_candidate
 from .compression_review import RegressionGate, compare_candidates
 from .model_export import export_plan, export_candidate, verify_package
+from .rust_parity import rust_parity
 
 
 def runtime_info() -> dict[str, str]:
@@ -40,7 +41,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E9a",
+        "stage": "E9b1",
     }
 
 
@@ -335,6 +336,12 @@ def parser() -> argparse.ArgumentParser:
     verify_export=commands.add_parser("student-verify-package")
     verify_export.add_argument("--root",required=True)
     verify_export.add_argument("--expected-package-id",required=True)
+    parity=commands.add_parser("student-rust-parity")
+    parity.add_argument("--root",required=True)
+    parity.add_argument("--expected-package-id",required=True)
+    parity.add_argument("--executable",required=True,help="Trusted locally built diagnostic Rust bridge")
+    parity.add_argument("--timeout-seconds",type=int,default=180)
+    parity.add_argument("--output",required=True)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -348,6 +355,13 @@ def main(argv=None) -> int:
             result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
             path=write_new(args.output,result)
             result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "student-rust-parity":
+            if Path(args.output).exists() or Path(args.output).is_symlink():
+                raise ValueError("output must be a new file")
+            result=rust_parity(args.root,expected_package_id=args.expected_package_id,
+                executable=args.executable,timeout_seconds=args.timeout_seconds)
+            path=write_new(args.output,result)
+            result=result|{"path":path}
         elif args.command == "student-export-plan":
             result=export_plan()
         elif args.command == "student-export-candidate":

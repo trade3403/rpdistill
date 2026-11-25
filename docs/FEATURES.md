@@ -77,3 +77,5 @@ E7b2 CI 10/10 success（合成盲评）。E8a FP32/FP16/INT8 存储候选、误�
 E8a 10/10 CI success；E8b 同源压缩实际生成回归、绝对/相对门槛及候选选择已提交待 CI。真实完整尺寸质量和人工验收未完成，非 Rust 原生低精度推理。
 
 E8b 10/10 CI success。E9a 独立自训练 FP32 候选包、权重与固定分词器资产、来源/许可/文件哈希及外部 pin 已提交待 CI；真实全尺寸单步训练和 Rust raw reader 全字节对照新增专项 workflow；生产 Rust 加载、质量授权 E9b。
+
+E9a 11/11 CI success，完整尺寸单步合成训练+Rust 312033188 bytes 全读取通过。E9b1 真实 Rust encoder/decoder/full/cached logits 与 greedy 诊断对照已提交待 CI；非生产 loader，质量与权利审批 E9b2。

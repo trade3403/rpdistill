@@ -70,3 +70,5 @@ E8a compression.py：已完成训练 checkpoint → canonical FP32 权重 → FP
 E8b compression_review.py：原训练 checkpoint + 冻结 benchmark + 压缩候选 → 严格读取与重算源转换 → 相同 CPU FP32 greedy/指标 → 固定绝对门槛、相对回归、新增逐条规则错误及词面泄漏审计 → 按实际 artifact bytes 最小合格候选，失败则 null；有界 case/软时间预算、报告内容 hash，release_ready=false。
 
 E9a model_export.py：已完成固定 profile checkpoint → canonical FP32 SafeTensors + 5 pinned tokenizer/config assets → 独立 rpdistill-model-candidate-v1 manifest 与外部 package pin、来源/许可说明和文件校验 → 不覆盖候选目录。官方 RPModel v1 仍独立，Rust raw reader CI 对照非生产模型加载；E9b 独立加载/质量 gate。详见 MODEL_CANDIDATE_FORMAT.md。
+
+E9b1 rust_parity.py：外部 package ID 验证 → 可信本地 Rust diagnostic executable、独立 weight SHA/metadata/pinned assets 验证 → 真实 Marian components/encoder memory/full+cached logits/greedy IDs → Python FP32 同候选对照和报告 hash。固定两 token/mask cases；非生产加载/文本 API，D 只读，E9b2 质量审批与集成。

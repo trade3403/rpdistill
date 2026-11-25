@@ -17,3 +17,6 @@
 ## CI 及 E9b
 
 独立 workflow checkout 固定 D commit，仅在 Runner 临时 checkout 增加 test-only Rust example，通过实际自主 SafeTensorReader 读取全部 256 FP32 张量，比较规范 little-endian stream SHA256/字节数、检查点权重逐位相等，并确认官方 package loader 拒绝独立候选。脚本以完整尺寸网络真实执行 1 个合成 token 训练步，非正式科研译文质量，不下载官方大型权重。待新 CI 验收。当前尚未通过 Rust 神经网络加载/生成，且未接自动质量授权或压缩候选导出；E9b 需独立生产加载入口、可信 pin/版本策略、实际 Rust encoder/decoder/generation 对照与质量授权绑定。正式许可、归属/训练数据限制、真实人评与发布策略仍需核查。
+
+## E9a 实际验收与 E9b1
+E9a 1ce24ce 标准 10/10、独立 Rust 1/1 success，实际完整尺寸合成单步训练、256 tensors / 312033188 bytes Rust SHA256 一致。E9b1 使用可信本地诊断桥（D 2fa70c1 临时 checkout 编译）读取 Python 外部 package ID 校验后的候选；Rust 再核对固定 asset 与同一权重 handle 的 SHA256/metadata/shape，调用实际 encoder/decoder、全量及 KV cache logits、无强制 EOS greedy 对照。两个固定 token/mask 样例，atol=rtol=3e-4，报告不授权发布。待新专项 CI。桥接程序不是原 RPTranslate 正式 loader 或完整文本接口；仍假定可信本地 executable 与稳定文件，不能抵抗并发修改。E9b2 衔接质量审批与正式集成。
