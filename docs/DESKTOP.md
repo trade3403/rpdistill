@@ -16,3 +16,6 @@ Windows TypeScript/esbuild 构建及原生 Electron 启动 smoke；Python CLI �
 ## 最新范围调整：仅 Windows GUI
 
 用户明确取消 macOS GUI（Linux GUI 此前已取消）。自本次提交起，E11/E12 桌面 GUI、原生启动 smoke、安装包和发行仅支持 Windows；macOS/Linux Python/Rust CLI、后端与计算 CI 维持原范围，不取消训练能力。历史提交 98dbde0 标准 CI [45633656271](https://github.com/trade3403/rpdistill/actions/runs/45633656271) 10/10 success，Desktop [45633656134](https://github.com/trade3403/rpdistill/actions/runs/45633656134) 首次 Windows 原生窗口/IPC success、macOS cancelled，曾请求单项重跑；macOS 自本次授权起不再是验收门槛，不将其记录为通过。保留 Windows 真实 Electron/持久队列 IPC smoke、sandbox/contextIsolation 与原后端 CI；新提交需核验标准 CI 及 Windows Desktop CI，通过后继续 E11b 模型搜索、许可和预算确认、下载队列操作。Europe PMC 继续暂缓，D 线保持只读，真实 GPU/教师质量/人工评审及正式安装包仍待验收。本节覆盖此前 Windows/macOS 双平台 GUI 计划，旧记录保留为历史。
+
+## E11a 高保真布局第一轮（独立视觉分支）
+依据 docs/assets/README.md 对 1672×941 中文深色设计稿的文字规范，重构左导航、中间流水线/六项真实指标/Loss 空状态/GPU 显存快照/任务错误摘要、右侧任务配置和单次/持续控制；未接入的配置与启动按钮禁用。窗口默认 1672×941，较窄窗口响应式排列，保留安全 IPC、实际下载/训练记录及 Windows 原生 smoke，扩展 smoke 检查三栏结构和禁用控制。未读取原 PNG 像素、未获得实际运行截图，不能称 1:1 还原；需在真实 Windows 运行、以原 PNG 逐项对照，核对 DPI 与字号、色值、尺寸及滚动。实时 Loss/利用率/事件流和操作仍待 E11b/E11c 接入。此分支不推进主分支 CI 门槛。

@@ -39,7 +39,7 @@ function query():Promise<Reply>{
 }
 let win:BrowserWindow|null=null;
 function create(){
-  win=new BrowserWindow({width:1440,height:900,minWidth:1000,minHeight:650,
+  win=new BrowserWindow({width:1672,height:941,minWidth:1000,minHeight:650,
     show:!smoke,backgroundColor:"#10141d",title:"RPDistill Studio",
     webPreferences:{preload:join(__dirname,"preload.cjs"),contextIsolation:true,nodeIntegration:false,
       sandbox:true,webSecurity:true,additionalArguments:smoke?["--studio-smoke"]:[]}});
