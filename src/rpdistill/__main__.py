@@ -32,6 +32,7 @@ from .compression import plan as compression_plan, create_candidate
 from .compression_review import RegressionGate, compare_candidates
 from .model_export import export_plan, export_candidate, verify_package
 from .rust_parity import rust_parity
+from .rust_profile import rust_profile
 from .export_review import review_integration, check_integration_receipt
 
 
@@ -42,7 +43,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E9b2",
+        "stage": "E10a",
     }
 
 
@@ -357,6 +358,10 @@ def parser() -> argparse.ArgumentParser:
     handoff=commands.add_parser("student-check-handoff",help="Verify existing local receipt integrity, not current rights or deployment")
     for flag in ("root","receipt","expected-package-id","expected-receipt-id"):
         handoff.add_argument("--"+flag,required=True)
+    profile=commands.add_parser("student-rust-profile",help="Measure fixed Rust diagnostic workloads, not translation quality")
+    for flag in ("root","expected-package-id","executable","output"):
+        profile.add_argument("--"+flag,required=True)
+    profile.add_argument("--timeout-seconds",type=int,default=180)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -388,6 +393,13 @@ def main(argv=None) -> int:
                 parity_timeout=args.parity_timeout)
             path=write_new(args.output,result)
             result={k:v for k,v in result.items() if k not in ("quality_review","rust_diagnostics")}|{"path":path}
+        elif args.command == "student-rust-profile":
+            if Path(args.output).exists() or Path(args.output).is_symlink():
+                raise ValueError("output must be a new file")
+            result=rust_profile(args.root,expected_package_id=args.expected_package_id,
+                executable=args.executable,timeout_seconds=args.timeout_seconds)
+            path=write_new(args.output,result)
+            result=result|{"path":path}
         elif args.command == "student-rust-parity":
             if Path(args.output).exists() or Path(args.output).is_symlink():
                 raise ValueError("output must be a new file")

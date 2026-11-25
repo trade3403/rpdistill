@@ -4,7 +4,7 @@ use rpinfer::{marian_decoder::{MarianDecoder,DECODER_PAYLOAD_BYTES},
     marian_encoder::{MarianEncoder,ENCODER_PAYLOAD_BYTES},
     marian_weights::MarianEmbeddings,marian_generation::MarianEncoded,
     matmul::Kernel,search::SearchConfig,tensor::Tensor};
-use std::{fs::{self,File},io::{self,BufWriter,Seek,SeekFrom,Write},path::Path};
+use std::{fs::{self,File},io::{self,BufWriter,Seek,SeekFrom,Write},path::Path,time::Instant};
 
 fn valid_id(s:&str)->bool {
     s.len()==64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
@@ -13,15 +13,81 @@ fn write_tensor(out:&mut impl Write,t:&Tensor)->io::Result<()> {
     for &v in t.data() { out.write_all(&v.to_le_bytes())?; }
     Ok(())
 }
+fn ns(start:Instant)->u128 {start.elapsed().as_nanos()}
+fn peak_rss_bytes()->u64 {
+    // Linux process-lifetime high water; zero means unsupported/unavailable.
+    fs::read_to_string("/proc/self/status").ok().and_then(|status| {
+        status.lines().find_map(|line| {
+            let rest=line.strip_prefix("VmHWM:")?;
+            let mut fields=rest.split_whitespace();
+            let kb=fields.next()?.parse::<u64>().ok()?;
+            if fields.next()?!="kB" {return None;}
+            kb.checked_mul(1024)
+        })
+    }).unwrap_or(0)
+}
+fn profile_inference(config:&MarianConfig,embeddings:&MarianEmbeddings,encoder:&MarianEncoder,
+                     decoder:&MarianDecoder,load:[u128;6])->Result<(),Box<dyn std::error::Error>> {
+    println!("rpdistill-profile-v1");
+    println!("load\t{}\t{}\t{}\t{}\t{}\t{}",load[0],load[1],load[2],load[3],load[4],load[5]);
+    for (source_len,max_new) in [(16usize,8usize),(64,16)] {
+        let source:Vec<u32>=(0..source_len).map(|i| if i+1==source_len {0} else {2+(i as u32*31)%1000}).collect();
+        let mask=vec![true;source_len];
+        let search=||SearchConfig{start:config.generation.start,eos:config.generation.eos,
+            beam_width:1,min_new:0,max_new,length_penalty:1.0,
+            suppress:&config.generation.suppress,force_eos_at_limit:false};
+        // Warm up both paths. Three measured repeats alternate execution order.
+        let mut reference:Option<Vec<u32>>=None;
+        for repeat in 0..=3 {
+            let start=Instant::now();
+            let memory=encoder.forward(embeddings,&source,Some(&mask),Kernel::Auto).map_err(|e|format!("{e:?}"))?;
+            let encoder_ns=ns(start);
+            let start=Instant::now();
+            let encoded=MarianEncoded::new(decoder,embeddings,&memory,Some(&mask),Kernel::Auto)
+                .map_err(|e|format!("{e:?}"))?;
+            let prepare_ns=ns(start);
+            let (a,b,full_ns,cached_ns)=if repeat%2==0 {
+                let start=Instant::now();
+                let a=encoded.generate(search()).map_err(|e|format!("{e:?}"))?;
+                let full_ns=ns(start);
+                let start=Instant::now();
+                let b=encoded.generate_cached(search()).map_err(|e|format!("{e:?}"))?;
+                (a,b,full_ns,ns(start))
+            } else {
+                let start=Instant::now();
+                let b=encoded.generate_cached(search()).map_err(|e|format!("{e:?}"))?;
+                let cached_ns=ns(start);
+                let start=Instant::now();
+                let a=encoded.generate(search()).map_err(|e|format!("{e:?}"))?;
+                (a,b,ns(start),cached_ns)
+            };
+            if a.len()!=1 || b.len()!=1 || a[0].tokens!=b[0].tokens || a[0].ended!=b[0].ended
+                || a[0].tokens.len()<2 || a[0].tokens.len()>max_new+1 {
+                return Err("profiling generation parity failed".into());
+            }
+            if let Some(ids)=&reference {
+                if ids!=&a[0].tokens {return Err("profile repeat differs".into());}
+            } else {reference=Some(a[0].tokens.clone());}
+            if repeat>0 {
+                let ids=a[0].tokens.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
+                println!("case\t{source_len}\t{max_new}\t{repeat}\t{encoder_ns}\t{prepare_ns}\t{full_ns}\t{cached_ns}\t{}\t{ids}",a[0].ended);
+            }
+        }
+    }
+    println!("rss\t{}",peak_rss_bytes());
+    Ok(())
+}
 fn main()->Result<(),Box<dyn std::error::Error>> {
     let args:Vec<String>=std::env::args().collect();
-    if args.len()!=4 || !valid_id(&args[2]) || !valid_id(&args[3]) {
+    let profiling=args.len()==5 && args[4]=="--profile";
+    if (args.len()!=4 && !profiling) || !valid_id(&args[2]) || !valid_id(&args[3]) {
         return Err("usage: bridge ROOT EXPECTED_WEIGHTS_SHA256 EXPECTED_CHECKPOINT_ID".into());
     }
     let root=Path::new(&args[1]);
     if !fs::symlink_metadata(root)?.file_type().is_dir() {return Err("invalid root".into());}
     // Package identity and manifest are checked by the Python caller. The
     // bridge independently verifies weight bytes and pinned asset bytes.
+    let timer=Instant::now();
     let model=package::verified_asset(root,"config.json").map_err(|e|format!("{e:?}"))?;
     let generation=package::verified_asset(root,"generation_config.json").map_err(|e|format!("{e:?}"))?;
     for name in ["source.spm","target.spm","vocab.json"] {
@@ -29,6 +95,8 @@ fn main()->Result<(),Box<dyn std::error::Error>> {
     }
     let config=MarianConfig::parse(std::str::from_utf8(&model)?,std::str::from_utf8(&generation)?)
         .map_err(|e|format!("{e:?}"))?;
+    let asset_ns=ns(timer);
+    let timer=Instant::now();
     let path=root.join("weights.safetensors");
     if !fs::symlink_metadata(&path)?.file_type().is_file() {return Err("invalid weights file".into());}
     let mut file=File::open(path)?;
@@ -38,6 +106,8 @@ fn main()->Result<(),Box<dyn std::error::Error>> {
     }
     let (actual,hash)=digest_reader(&mut file,size)?;
     if actual!=size || hash!=args[2] {return Err("weight pin mismatch".into());}
+    let hash_ns=ns(timer);
+    let timer=Instant::now();
     file.seek(SeekFrom::Start(0))?;
     let mut reader=SafeTensorReader::open(file).map_err(|e|format!("{e:?}"))?;
     let meta=reader.metadata();
@@ -54,10 +124,21 @@ fn main()->Result<(),Box<dyn std::error::Error>> {
         let t=reader.tensors().get(name).ok_or("missing tensor")?;
         if t.dtype!=Dtype::F32 || &t.shape!=shape {return Err("tensor mismatch".into());}
     }
+    let header_ns=ns(timer);
+    let timer=Instant::now();
     let embeddings=MarianEmbeddings::load(&mut reader,&config,135_479_204).map_err(|e|format!("{e:?}"))?;
+    let embedding_ns=ns(timer);
+    let timer=Instant::now();
     let encoder=MarianEncoder::load(&mut reader,&config,ENCODER_PAYLOAD_BYTES).map_err(|e|format!("{e:?}"))?;
+    let encoder_load_ns=ns(timer);
+    let timer=Instant::now();
     let decoder=MarianDecoder::load(&mut reader,&config,DECODER_PAYLOAD_BYTES).map_err(|e|format!("{e:?}"))?;
+    let decoder_load_ns=ns(timer);
     drop(reader);
+    if profiling {
+        return profile_inference(&config,&embeddings,&encoder,&decoder,
+            [asset_ns,hash_ns,header_ns,embedding_ns,encoder_load_ns,decoder_load_ns]);
+    }
     let cases:[(&[u32],&[bool],&[u32],&[bool]);2]=[
         (&[2,3,0],&[true,true,true],&[65000,4],&[true,true]),
         (&[2047,2048,0,65000],&[true,true,true,false],&[65000,17,65000,4],&[true,true,false,true])

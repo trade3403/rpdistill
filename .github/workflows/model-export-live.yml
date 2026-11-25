@@ -8,6 +8,7 @@ on:
       - 'src/rpdistill/quality_review.py'
       - 'src/rpdistill/evaluation.py'
       - 'src/rpdistill/rust_parity.py'
+      - 'src/rpdistill/rust_profile.py'
       - 'scripts/rpdistill_candidate_infer.rs'
       - 'src/rpdistill/student.py'
       - 'src/rpdistill/student_evaluation.py'

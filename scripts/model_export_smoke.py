@@ -17,6 +17,7 @@ from rpdistill.distill import DistillConfig,train_sequence,save_checkpoint
 from rpdistill.training_data import acquire_assets,ASSET_BYTES
 from rpdistill.model_export import export_candidate,verify_package,REQUIRED_BYTES,PAYLOAD
 from rpdistill.rust_parity import rust_parity
+from rpdistill.rust_profile import rust_profile
 from rpdistill.export_review import verify_source_weights,check_integration_receipt
 
 torch.set_num_threads(2)
@@ -96,6 +97,12 @@ with tempfile.TemporaryDirectory() as tmp:
     else:
         raise AssertionError("diagnostic report accepted as integration receipt")
     print(json.dumps({"diagnostic_report_cannot_authorize_handoff":True,"release_ready":False}))
+    profile=rust_profile(root/"candidate",expected_package_id=m["package_id"],executable=bridge,timeout_seconds=300)
+    assert profile["rust_process_peak_rss_bytes"]>0
+    assert len(profile["cases"])==2 and all(c["full_cached_token_match"] for c in profile["cases"])
+    assert all(c["measured_repeats"]==3 and c["actual_generated_tokens"]>0 for c in profile["cases"])
+    assert not profile["quality_test"] and not profile["release_ready"]
+    print(json.dumps({"actual_rust_profile":True,"profile":profile}))
     # Current official package loader MUST reject the distinct package.
     rejected=subprocess.run([str(official),str(root/"candidate")],capture_output=True)
     assert rejected.returncode!=0,"official package loader accepted independent candidate"
