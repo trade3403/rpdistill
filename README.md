@@ -5,7 +5,7 @@
 RPDistill 负责教师模型、语料、训练、评测和模型导出。RPTranslate 保持独立 Rust 推理，不依赖训练环境。
 
 ## 当前状态
-E2.2a：E2.1 CPU CI 六环境已通过；新增持久化下载队列、文件级进度、协作暂停/取消与恢复（待 CI 验收）。尚未接入真实教师模型或 GPU 训练，GUI 为后续阶段。
+E2.2b1：E2.2a CPU CI 六环境已通过；新增 ModelScope 检索、版本查询、固定 SHA 下载、校验与独立注册（待 CI）。尚未完成真实在线模型或 GPU 训练验收。
 
 ## 快速开始
 ```sh
@@ -23,7 +23,7 @@ python -m unittest discover -s tests -v
 - [研发进度与 CI 验收台账（PROGRESS.md）](docs/PROGRESS.md)
 
 ## 内置在线下载（规划中的必选功能）
-教师模型及合法公开训练数据集支持软件内搜索、一键下载、断点续传、完整性校验与自动入库；正常联网使用无需手动下载文件。E2.1 Hugging Face 基础搜索/下载/注册 CPU CI 已通过；E2.2a 队列及文件级进度待 CI，ModelScope 与数据集仍待开发。
+教师模型及合法公开训练数据集支持软件内搜索、一键下载、断点续传、完整性校验与自动入库；正常联网使用无需手动下载文件。E2.1 Hugging Face 基础搜索/下载/注册 CPU CI 已通过；E2.2a 队列及文件级进度 CPU CI 已通过；E2.2b1 ModelScope 基础适配待 CI，实时网络字节与数据集仍待开发。
 
 ## 科研论文在线采集（必选，待开发）
 直接在软件内按关键词、学科、日期搜索论文，批量下载许可允许的全文并自动解析、分段入库，由教师模型生成高质量双语训练语料。不需要手动逐篇下载 PDF。E3 实现核心、E11 集成 GUI。
@@ -57,3 +57,12 @@ python -m rpdistill model-list
 
 ### E2.2a 下载队列
 将 model-download 替换为 download-enqueue（参数相同），再执行 `python -m rpdistill download-run` 处理一个排队任务。另一终端可执行 download-list、download-show ID、download-pause ID、download-cancel ID。暂停/取消在文件间检查，不强制中断 SDK 正在传输的单个文件；download-resume ID 重新排队，SDK 缓存复用，实际字节断点能力待联网验证。download-recover ID --worker-stopped 仅在确认原 worker 已退出时使用。rate/eta 是已校验文件字节的处理速率及估算，包含缓存命中，不是网络带宽。单次 run 仅执行一个任务，持续调度待后续。
+
+### E2.2b1 ModelScope
+```sh
+python -m pip install -e ".[modelscope]"
+python -m rpdistill model-search Qwen --source modelscope
+python -m rpdistill model-revisions Qwen/Qwen3-0.6B
+python -m rpdistill model-list --source modelscope
+``
+用实际完整 commit SHA、已核查的许可证和字节预算执行 model-download 或 download-enqueue，加 --source modelscope。只接收明确公开且每个选中文件具备上游 SHA-256 的模型；不能确认时拒绝下载，不自动降级到浮动分支。ModelScope 记录与 Hugging Face 隔离。当前模拟 SDK CI；实际在线响应、SDK 版本及网络速度需 E2.2b2 验证。仍使用文件级进度及 SDK 缓存，不是实时网络带宽。

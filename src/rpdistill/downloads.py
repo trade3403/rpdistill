@@ -60,7 +60,12 @@ class DownloadQueue:
             return [self._get(db, r[0]) for r in db.execute(
                 "SELECT id FROM model_download_jobs ORDER BY created, id")]
 
-    def enqueue(self, model_id, revision, *, reviewed_license, max_bytes, cache_dir):
+    def enqueue(self, model_id, revision, *, reviewed_license, max_bytes, cache_dir,
+                source="huggingface"):
+        if source not in ("huggingface", "modelscope"):
+            raise ValueError("unknown model source")
+        if source == "modelscope" and "/" not in model_id:
+            raise ValueError("ModelScope requires owner/name")
         validate_id(model_id)
         validate_revision(revision)
         if not isinstance(reviewed_license, str) or not reviewed_license.strip():
@@ -69,6 +74,8 @@ class DownloadQueue:
             raise ValueError("invalid byte budget")
         spec = dict(model_id=model_id, revision=revision, reviewed_license=reviewed_license,
                     max_bytes=max_bytes, cache_dir=str(Path(cache_dir).resolve()))
+        if source != "huggingface":
+            spec["source"] = source
         encoded = json.dumps(spec, sort_keys=True)
         with self._write() as db:
             existing = db.execute("""SELECT id FROM model_download_jobs
@@ -114,7 +121,7 @@ class DownloadQueue:
                        (target, now(), job_id))
             return self._get(db, job_id)
 
-    def run_next(self, *, execute=download_teacher):
+    def run_next(self, *, execute=None):
         with self._write() as db:
             # Enforce a single active worker per database, including pending stop requests.
             if db.execute("""SELECT 1 FROM model_download_jobs WHERE
@@ -129,6 +136,13 @@ class DownloadQueue:
                        total_bytes=NULL,rate=NULL,eta=NULL,error=NULL,updated=? WHERE id=?""",
                        (now(), job_id))
             spec = self._get(db, job_id)["spec"]
+        source = spec.pop("source", "huggingface")
+        if execute is None:
+            if source == "modelscope":
+                from .modelscope_source import download_modelscope
+                execute = download_modelscope
+            else:
+                execute = download_teacher
         start = time.monotonic()
 
         def checkpoint():
@@ -154,7 +168,7 @@ class DownloadQueue:
 
         target, error = "succeeded", None
         try:
-            execute(**spec, registry=TeacherRegistry(self.path),
+            execute(**spec, registry=TeacherRegistry(self.path, source=source),
                     checkpoint=checkpoint, progress=progress)
         except StopRequested:
             target = "interrupted"

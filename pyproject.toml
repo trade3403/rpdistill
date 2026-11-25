@@ -11,6 +11,7 @@ dependencies = []
 
 [project.optional-dependencies]
 hub = ["huggingface_hub>=0.31,<2"]
+modelscope = ["modelscope-hub>=0.7,<1"]
 
 [project.scripts]
 rpdistill = "rpdistill.__main__:main"

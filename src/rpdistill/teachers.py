@@ -154,18 +154,24 @@ def verify_snapshot(path, selected, *, checkpoint=None):
 
 
 class TeacherRegistry:
-    def __init__(self, db_path):
+    def __init__(self, db_path, source="huggingface"):
+        if source not in ("huggingface", "modelscope"):
+            raise ValueError("unknown model source")
+        self.source = source
+        self.table = "teachers" if source == "huggingface" else "modelscope_teachers"
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with closing(sqlite3.connect(self.db_path)) as db, db:
-            db.execute("""CREATE TABLE IF NOT EXISTS teachers (
+            db.execute(f"""CREATE TABLE IF NOT EXISTS {self.table} (
                 model_id TEXT NOT NULL, revision TEXT NOT NULL, record TEXT NOT NULL,
                 PRIMARY KEY(model_id, revision))""")
 
     def put(self, teacher, path, manifest):
         record = asdict(teacher) | {"path": str(path), "manifest": manifest}
+        if self.source == "modelscope":
+            record["source"] = self.source
         with closing(sqlite3.connect(self.db_path)) as db, db:
-            db.execute("""INSERT INTO teachers VALUES (?, ?, ?)
+            db.execute(f"""INSERT INTO {self.table} VALUES (?, ?, ?)
                 ON CONFLICT(model_id, revision) DO UPDATE SET record=excluded.record""",
                 (teacher.model_id, teacher.revision, json.dumps(record, allow_nan=False)))
         return record
@@ -173,7 +179,7 @@ class TeacherRegistry:
     def list(self):
         with closing(sqlite3.connect(self.db_path)) as db:
             return [json.loads(row[0]) for row in db.execute(
-                "SELECT record FROM teachers ORDER BY model_id, revision")]
+                f"SELECT record FROM {self.table} ORDER BY model_id, revision")]
 
 
 def download_teacher(model_id, revision, *, reviewed_license, max_bytes, cache_dir,

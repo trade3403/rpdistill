@@ -12,6 +12,7 @@ from .tasks import TaskStore
 from .teachers import TeacherRegistry, search_teachers, download_teacher
 from dataclasses import asdict
 from .downloads import DownloadQueue
+from .modelscope_source import search_models, revisions, download_modelscope
 
 
 def runtime_info() -> dict[str, str]:
@@ -21,7 +22,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E2.2a",
+        "stage": "E2.2b1",
     }
 
 
@@ -46,9 +47,14 @@ def parser() -> argparse.ArgumentParser:
     search = commands.add_parser("model-search")
     search.add_argument("query")
     search.add_argument("--limit", type=int, default=20)
-    commands.add_parser("model-list")
+    listing = commands.add_parser("model-list")
+    listing.add_argument("--source", choices=["huggingface", "modelscope"], default="huggingface")
+    search.add_argument("--source", choices=["huggingface", "modelscope"], default="huggingface")
+    rev = commands.add_parser("model-revisions")
+    rev.add_argument("model_id")
     fetch = commands.add_parser("model-download")
     fetch.add_argument("model_id")
+    fetch.add_argument("--source", choices=["huggingface", "modelscope"], default="huggingface")
     fetch.add_argument("--revision", required=True)
     fetch.add_argument("--reviewed-license", required=True,
                        help="License identifier after reviewing intended-use rights")
@@ -56,6 +62,7 @@ def parser() -> argparse.ArgumentParser:
     fetch.add_argument("--cache-dir", default=str(Path.home() / ".rpdistill" / "hub"))
     enqueue = commands.add_parser("download-enqueue")
     enqueue.add_argument("model_id")
+    enqueue.add_argument("--source", choices=["huggingface", "modelscope"], default="huggingface")
     enqueue.add_argument("--revision", required=True)
     enqueue.add_argument("--reviewed-license", required=True)
     enqueue.add_argument("--max-bytes", type=int, required=True)
@@ -84,7 +91,7 @@ def main(argv=None) -> int:
             if action == "enqueue":
                 result = queue.enqueue(args.model_id, args.revision,
                     reviewed_license=args.reviewed_license, max_bytes=args.max_bytes,
-                    cache_dir=args.cache_dir)
+                    cache_dir=args.cache_dir, source=args.source)
             elif action == "list":
                 result = queue.list()
             elif action == "run":
@@ -96,14 +103,18 @@ def main(argv=None) -> int:
             else:
                 result = queue.control(args.id, action)
         elif args.command == "model-search":
-            result = [asdict(x) for x in search_teachers(args.query, args.limit)]
+            result = (search_models(args.query, args.limit) if args.source == "modelscope"
+                      else [asdict(x) for x in search_teachers(args.query, args.limit)])
+        elif args.command == "model-revisions":
+            result = revisions(args.model_id)
         elif args.command == "model-list":
-            result = TeacherRegistry(args.db).list()
+            result = TeacherRegistry(args.db, source=args.source).list()
         elif args.command == "model-download":
-            result = download_teacher(
+            download = download_modelscope if args.source == "modelscope" else download_teacher
+            result = download(
                 args.model_id, args.revision, reviewed_license=args.reviewed_license,
                 max_bytes=args.max_bytes, cache_dir=args.cache_dir,
-                registry=TeacherRegistry(args.db))
+                registry=TeacherRegistry(args.db, source=args.source))
         else:
             store = TaskStore(args.db)
             if args.command == "create":
