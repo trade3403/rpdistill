@@ -17,6 +17,19 @@ assert torch.isfinite(out.logits).all()
 assert model.model.encoder.embed_tokens.weight is model.model.shared.weight
 assert model.model.decoder.embed_tokens.weight is model.model.shared.weight
 assert model.lm_head.weight is model.model.shared.weight
+from rpdistill.training_data import batch_arrays,tensor_batch
+arrays=batch_arrays([{"source_ids":[2,3,0],"target_ids":[7,0]},
+                     {"source_ids":[2,4,5,0],"target_ids":[9,10,0]}],p)
+with torch.no_grad():
+    tensors=tensor_batch(arrays)
+    result=model(**tensors,use_cache=False)
+    reference=torch.nn.functional.cross_entropy(result.logits.reshape(-1,p.vocab),
+        tensors["labels"].reshape(-1),ignore_index=-100)
+    assert torch.isfinite(result.loss)
+    assert torch.allclose(result.loss,reference)
+    assert tensors["decoder_attention_mask"][:,0].tolist()==[1,1]
+    assert (tensors["labels"]!=-100).sum().item()==5
+print(json.dumps({"masked_loss":result.loss.item(),"supervised_tokens":5,"parameter_update":False}))
 del model
 # Exact production-shape random initialization: no full-size generation or training.
 model=build_student(FIXED)

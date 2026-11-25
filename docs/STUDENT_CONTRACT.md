@@ -21,3 +21,6 @@ student.py：精确 shape/name/dtype/finite/tied storage 验证、随机初始�
 ## 明确不兼容之处
 
 当前 Rust loader 对官方来源、revision、checkpoint SHA、固定配置/分词器及 canonical 权重 manifest 有强约束。新学生权重来源不同，即便形状相同也不能把它伪装成官方基线权重；现阶段 rust_deployable=false。E9 必须协调 D 线独立自训练 package profile、可信来源与实际 Rust 加载/数值/生成对照，不能修改官方 SHA 冒充官方包。E4b 接真实本地分词器资产与训练 batch、mask、labels、长度限制及小型真实 CPU 训练入口；E5 执行实际学生参数更新、检查点和蒸馏。可缩小的测试 profile 不是 D 线部署模型。真实 Qwen 权重及 GPU 留用户本机验收。
+
+## E4b 实现及验收范围
+固定 ASSETS 自动下载、网络/磁盘预算、Range 缓存与有限重试；无需下载原始 312MB 权重。training_data.py 验证候选快照哈希和当前全文登记/文件哈希，严格按指定 split 选取、未知/超长文本隔离；构造 source padding/mask、decoder shift-right (PAD=start 但 mask=1)、目标 labels padding=-100、按 padded token/logits 元素数限制批次。完整模型生成/训练内存不等于这些预算。真实小学生 masked loss 与显式 cross entropy 对照，未更新参数；新独立 CI 在真实固定 SPM 上与 HF low-level MarianTokenizer、D 线 Rust marian_codec 对照。不宣称所有 Unicode 或近似重复语料正确，训练授权与语义评测仍未完成。E4a 4250379 标准 9/9 与 Hub 2/2 CI 成功，E4b 新 CI 待验收。

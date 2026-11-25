@@ -21,6 +21,7 @@ from .corpus import CorpusStore
 from .datasets import DatasetStore, DatasetGate
 from .pipeline import CorpusPipeline
 from .student import contract as student_contract, checked_assets
+from .training_data import acquire_assets, batch_plan
 
 
 def runtime_info() -> dict[str, str]:
@@ -30,7 +31,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E4a",
+        "stage": "E4b",
     }
 
 
@@ -165,6 +166,17 @@ def parser() -> argparse.ArgumentParser:
             cmd.add_argument("--worker-stopped",action="store_true")
     student = commands.add_parser("student-info")
     student.add_argument("--assets",help="Verify pinned local configuration and tokenizer assets")
+    asset = commands.add_parser("student-assets")
+    asset.add_argument("--root",required=True)
+    asset.add_argument("--max-bytes",type=int,required=True)
+    batch = commands.add_parser("student-batch-plan")
+    batch.add_argument("version")
+    batch.add_argument("--assets",required=True)
+    batch.add_argument("--split",choices=["train","validation","test"],default="train")
+    batch.add_argument("--limit",type=int,default=1000)
+    batch.add_argument("--batch-size",type=int,default=4)
+    batch.add_argument("--max-padded-tokens",type=int,default=4096)
+    batch.add_argument("--max-logits",type=int,default=16777216)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -174,6 +186,11 @@ def main(argv=None) -> int:
     try:
         if args.command in (None, "info"):
             result = runtime_info()
+        elif args.command == "student-assets":
+            result=acquire_assets(args.root,max_bytes=args.max_bytes)
+        elif args.command == "student-batch-plan":
+            result=batch_plan(args.db,args.version,args.assets,split=args.split,limit=args.limit,
+                batch_size=args.batch_size,max_padded_tokens=args.max_padded_tokens,max_logits=args.max_logits)
         elif args.command == "student-info":
             result=student_contract()
             if args.assets:

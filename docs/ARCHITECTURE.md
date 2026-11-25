@@ -48,3 +48,5 @@ E3.3a CorpusStore：输入已登记 PMC XML 和 PaperCatalog，检查当前资�
 E3.3b DatasetStore 保存不可覆盖的内容寻址候选快照与成员，按固定教师配置筛选、重新哈希当前全文、精确源文本跨版本 split 防护，计数门槛不足不生成版本；导出校验哈希且不覆盖。CorpusPipeline 单次循环串联检索到候选快照，持久阶段，单 worker，解析/翻译/快照恢复；采集失败不自动重放预算。现有共享目录候选不严格按本次查询隔离，持续运行、增量分页、语义质量与训练授权留后续。
 
 E4a：student.py 固定 D 线 Marian 6+6/512/8/2048/65001 契约，PyTorch 训练侧随机初始化、canonical 权重验证、固定 SPM/词表文件校验及共享 network ID 映射；测试小 profile 不作为部署模型。真实 Rust loader 当前固定官方来源及哈希，E9 需自训练 package profile；见 STUDENT_CONTRACT.md。
+
+E4b training_data.py：固定 tokenizer assets 下载与完整性；DatasetStore 不可变候选成员→当前全文/许可元数据/版本校验→StudentCodec→按 split 和 token/logits 预算组 batch，labels padding=-100、Marian decoder start PAD 保持 attention=1。训练计划不更新参数或认证数据；E5 接真实训练器。

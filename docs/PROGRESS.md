@@ -37,7 +37,8 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E3.2 | 全文 XML 下载与许可复核 | 10/10 必需 CI 通过（10 篇实测） |
 | E3.3a | JATS 解析、候选双语语料 | 10/10 必需 CI 通过（337 段实测） |
 | E3.3b | 数据集候选版本与单次自动采集翻译调度 | 标准 CI 8/8 通过 |
-| E4a | D 线审计、Marian 学生架构及权重契约 | 已提交，待 CI |
+| E4a | D 线审计、Marian 学生架构及权重契约 | 标准 9/9 + Hub 2/2 CI 通过 |
+| E4b | 固定真实分词器、候选训练批次及损失掩码 | 已提交，待 CI |
 | E3 后续 | 全文许可复核、下载、解析及语料生成 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -132,3 +133,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E3.3b 验收及 E4a
 提交 65619c3286ad047ab177d3e7ee66d0fac25afcd1：[CI 45601299054](https://github.com/trade3403/rpdistill/actions/runs/45601299054) 8/8 success；论文联网路径未变，上次 45599371716 NCBI 2/2 通过。E4a 只读审计 D 线 feature/rptranslate 固定 7f1fdb282bbdc947dc4a5d953768efaed429959d；新增 student.py、StudentProfile、canonical 形状/共享权重验证、固定资产哈希、保守分词 ID 映射、student-info、4 个单元测试、新增 real-cpu-student job：真实小 Marian 前向及完整尺寸随机初始化。256 canonical tensors、312033188 FP32 payload bytes，非实测总内存。D loader 仍固定官方来源/哈希，rust_deployable=false；不伪造包。E4b 真实 tokenizer 资产对照与训练 batch/labels/mask，E5 真实参数更新；E9 自训练包 Rust 验收。详情 docs/STUDENT_CONTRACT.md。新 CI 待验收。
+
+## E4a 验收与 E4b
+提交 4250379ba05c096073e11952a859617faabb1d3b：[标准 CI 45603053723](https://github.com/trade3403/rpdistill/actions/runs/45603053723) 9/9、[Hub 联网 45603053807](https://github.com/trade3403/rpdistill/actions/runs/45603053807) 2/2 success；真实学生小网络前向与完整尺寸 256 张量初始化通过。E4b training_data.py：5 个固定哈希小资产自动下载，不下载权重；从 candidate snapshot 检查完整版本/成员/当前全文哈希许可预筛，选定 split 进行分词，动态 batch、mask/decoder shift/labels=-100、token/logits 预算；CLI student-assets/student-batch-plan。新增 5 个单元测试方法（4 training_data + 1 snapshot），真实 CPU smoke 增加 masked loss 对照；新增真实固定资产 Python/HF/Rust 三方 ID 对照 workflow，D 线 checkout 固定审计 SHA 只读。新 CI 待验收。候选数据仍 training_ready=false，未更新模型权重、未测试真实 Qwen/GPU；正式训练权利/语义质量门槛、完整自动调度及自训练包部署留后续。

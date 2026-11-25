@@ -149,3 +149,24 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(result["stage"],0)
         with self.assertRaises(ValueError):
             pipe.resume(run["id"])
+
+    def test_tokenized_snapshot_split_and_current_integrity(self):
+        from rpdistill.training_data import snapshot_examples
+        self.populate()
+        self.corpus.translate(self.translator())
+        manifest=self.make()
+        codec=Mock()
+        codec.encode.side_effect=lambda text,target=False: [3,0] if target else [2,4,0]
+        rows,stats=snapshot_examples(self.db,manifest["version"],codec,split="train")
+        self.assertEqual(stats["accepted"],1)
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["target_ids"],[3,0])
+        self.assertEqual(codec.encode.call_count,2)
+        self.library.path_for(self.ids["train"]).write_bytes(b"tampered")
+        rows,stats=snapshot_examples(self.db,manifest["version"],codec,split="train")
+        self.assertEqual(rows,[])
+        self.assertEqual(stats["excluded"],1)
+        with closing(sqlite3.connect(self.db)) as db,db:
+            db.execute("UPDATE dataset_members SET record=replace(record,'Research','Tampered') WHERE ordinal=0")
+        with self.assertRaises(ValueError):
+            snapshot_examples(self.db,manifest["version"],codec,split="train")

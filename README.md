@@ -105,3 +105,6 @@ E3.3a 标准 CI 8/8 与 NCBI 真实联网 2/2 通过，实际下载 10 篇并提
 
 ### E4a 学生模型契约
 E3.3b 标准 CI 8/8 已通过；E4a 依据 D 线固定提交审计 Marian 6+6 层、512 hidden、8 heads、FFN 2048、65001 词表，建立 PyTorch 学生架构与 canonical 权重验证。`python -m rpdistill student-info` 查看契约，`--assets PATH` 验证已在本地准备的固定 tokenizer/config 文件；`pip install -e '.[student]'` 安装学生依赖。学生是随机初始化，尚未训练、未通过真实 tokenizer/Rust 对照。当前 D 线仅接受固定官方审计包，新学生不能冒充原始模型；详见 [STUDENT_CONTRACT](docs/STUDENT_CONTRACT.md)。新 CI 待验收。
+
+### E4b 固定分词器与候选训练批次
+E4a 4250379 标准 CI 9/9、Hub 2/2 成功。`student-assets --root PATH --max-bytes 4194304` 自动获取固定 OPUS-MT revision 的 5 个配置/分词器文件（仅约 3.23 MB，不下载权重），哈希校验、限额、缓存、有限重试。`student-batch-plan VERSION --assets PATH --split train` 从不可覆盖候选快照验证版本/成员/当前全文资格与哈希，分词、动态 padding、源和 decoder mask、shift-right labels=-100 忽略填充、按 token/logits 限制构建批次。报告仅候选计划 training_ready=false；不更新权重。CI 增加固定真实 SPM/网络词表与 Python MarianTokenizer、D 线固定 Rust 分词器三方对照，以及微型 Marian masked CE loss 验证。D 仓库只读，不下载大型模型。仍需 E5 权重更新和正式训练授权、完整质量复核，E9 自训练包 Rust 验收。
