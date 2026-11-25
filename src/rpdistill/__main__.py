@@ -26,6 +26,7 @@ from .distill import DistillConfig, train_reviewed_snapshot
 from .resumable import ResumeConfig, train_reviewed_segment
 from .training_queue import TrainingQueue
 from .evaluation import freeze_benchmark, evaluate, read_json, read_jsonl, write_new, QualityGate
+from .student_evaluation import GenerationConfig, evaluate_checkpoint
 
 
 def runtime_info() -> dict[str, str]:
@@ -35,7 +36,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E7a",
+        "stage": "E7b1",
     }
 
 
@@ -271,6 +272,15 @@ def parser() -> argparse.ArgumentParser:
     ev.add_argument("--label",default="external hypotheses")
     ev.add_argument("--gate",help="Optional JSON object overriding default QualityGate")
     ev.add_argument("--output",required=True)
+    student_ev=commands.add_parser("benchmark-student")
+    student_ev.add_argument("--benchmark",required=True)
+    student_ev.add_argument("--checkpoint",required=True)
+    student_ev.add_argument("--assets",required=True)
+    student_ev.add_argument("--baseline",help="Optional external hypothesis JSONL for same benchmark")
+    student_ev.add_argument("--gate",help="Optional JSON object overriding default QualityGate")
+    student_ev.add_argument("--max-new-tokens",type=int,default=128)
+    student_ev.add_argument("--max-logits",type=int,default=16777216)
+    student_ev.add_argument("--output",required=True)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -284,6 +294,15 @@ def main(argv=None) -> int:
             result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
             path=write_new(args.output,result)
             result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "benchmark-student":
+            if Path(args.output).exists() or Path(args.output).is_symlink():
+                raise ValueError("output must be a new file")
+            gate=QualityGate(**read_json(args.gate)) if args.gate else QualityGate()
+            result=evaluate_checkpoint(args.db,read_json(args.benchmark),args.checkpoint,args.assets,
+                config=GenerationConfig(args.max_new_tokens,args.max_logits),gate=gate,
+                baseline=read_jsonl(args.baseline) if args.baseline else None)
+            path=write_new(args.output,result)
+            result={k:v for k,v in result.items() if k not in ("details","generation")}|{"path":path}
         elif args.command == "benchmark-score":
             gate=QualityGate(**read_json(args.gate)) if args.gate else QualityGate()
             result=evaluate(args.db,read_json(args.benchmark),read_jsonl(args.hypotheses),gate=gate,label=args.label)
