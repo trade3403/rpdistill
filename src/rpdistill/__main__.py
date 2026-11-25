@@ -35,6 +35,7 @@ from .rust_parity import rust_parity
 from .rust_profile import rust_profile
 from .projection_experiment import compare_projection
 from .export_review import review_integration, check_integration_receipt
+from .studio import snapshot as studio_snapshot
 
 
 def runtime_info() -> dict[str, str]:
@@ -44,7 +45,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E10b",
+        "stage": "E11a",
     }
 
 
@@ -53,6 +54,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--db", default=str(Path.home() / ".rpdistill" / "tasks.sqlite3"))
     commands = p.add_subparsers(dest="command")
     commands.add_parser("info")
+    commands.add_parser("studio-snapshot")
     dev = commands.add_parser("devices")
     dev.add_argument("--path", default=".")
     create = commands.add_parser("create")
@@ -532,6 +534,8 @@ def main(argv=None) -> int:
             result=student_contract()
             if args.assets:
                 result["verified_assets"]=str(checked_assets(args.assets))
+        elif args.command == "studio-snapshot":
+            result=studio_snapshot(args.db)
         elif args.command == "devices":
             result = device_report(args.path)
         elif args.command == "paper-search":

@@ -80,3 +80,5 @@ E9b2 交接：原 export_review.py 继续作为唯一审批实现；签发前复
 E10a rust_profile.py：外部 pin 校验 → 可信 Rust bridge --profile（不改变原 parity 二进制协议）→ 固定合成 workload、加载/encoder/prepare/full/cache 计时、warmup/重复与生成一致性 → 有界协议解析、median/实际 token throughput/进程峰值 RSS、报告 hash；同一进程加载一次，OS 缓存不控制，性能不等于生产 SLA。原 D 只读。
 
 E10b projection_experiment.py：同一外部 pin package → 原版及临时实验版 Rust trusted executables → 完整短诊断字节一致 → 相同两组 workload 运行/profile 比较；词表投影最多4个独立行分片，原 FP32 累加顺序、共享权重及边界保持。D 原仓库只读，实验不授权生产使用。
+
+E11a desktop：Electron main 固定参数 spawn Python -m rpdistill studio-snapshot（可信本地 Python，固定 DB，15s timeout、1MiB stdout）→ SQLite mode=ro 有界快照 + device_report → 版本化 snapshot-v1 → contextBridge 单一只读 IPC → React/TS 本地页面，CSP/沙箱/禁任意导航/权限。无通用命令执行，无模拟训练指标；下一步显式操作白名单与 worker 生命周期。

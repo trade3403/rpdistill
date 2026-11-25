@@ -155,3 +155,6 @@ E10a 首次完整尺寸 Rust 专项成功：缓存解码比普通解码 1.13/1.2
 
 ### E10b 词表投影性能实验
 E10a 修复后标准及专项 11/11 success。E10b 在临时固定 D checkout 中尝试最多四线程 FP32 词表行并行，保留每行累加顺序和共享权重，不修改原 D 仓库。`student-rust-compare-projection --root PACKAGE --expected-package-id HASH --baseline-executable TRUSTED_BASELINE --experiment-executable TRUSTED_EXPERIMENT --output REPORT.json`：相同包双构建完整诊断字节一致后，同机实测两组吞吐、延迟、RSS；不要求固定加速比。CI 新增真实对照与 D library 回归，尚未验收；实验不是生产部署或正式翻译质量。详见 [性能基准](docs/PERFORMANCE.md)。
+
+### E11a 桌面工作台
+E10b 11/11 CI success，完整尺寸词表投影实验同机合成生成加速 4.4–7.1%，3134424 诊断字节一致，Rust 52/52 tests。桌面首次接入 Electron + React + TypeScript，在可信本机 Python 环境先 `python -m pip install -e .`，再 `cd desktop && npm install && npm run build && npm start`。可用 RPDISTILL_PYTHON（可信 executable）、RPDISTILL_DB（本地 SQLite 路径）环境变量。只读快照读取真实记录、自动刷新、硬件探测，未接入训练/下载控制或实时 loss；无假进度。新 Desktop CI 三平台构建、Linux 真窗口 IPC smoke，待验收。直接依赖固定，传递 lock/正式安装包尚未完成。见 [桌面工程说明](docs/DESKTOP.md)。

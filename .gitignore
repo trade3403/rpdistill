@@ -18,3 +18,6 @@ dist/
 *.pth
 *.gguf
 *.onnx
+
+/desktop/node_modules/
+/desktop/dist/

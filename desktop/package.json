@@ -1,0 +1,23 @@
+{
+  "name": "rpdistill-studio",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "tsc --noEmit && node build.mjs",
+    "start": "electron .",
+    "smoke": "electron . --studio-smoke"
+  },
+  "dependencies": {
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "electron": "40.0.0",
+    "typescript": "5.8.3",
+    "esbuild": "0.25.10",
+    "@types/node": "22.15.3",
+    "@types/react": "19.1.1",
+    "@types/react-dom": "19.1.1"
+  }
+}

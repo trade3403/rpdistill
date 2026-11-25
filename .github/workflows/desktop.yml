@@ -1,0 +1,45 @@
+name: RPDistill Studio desktop
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'src/rpdistill/**'
+      - 'tests/test_studio.py'
+      - 'pyproject.toml'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - uses: actions/setup-python@v5
+        if: runner.os == 'Linux'
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e ..
+        if: runner.os == 'Linux'
+      - name: Launch real Electron and read persisted queue fixture
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          export RPDISTILL_PYTHON="$(command -v python)"
+          export RPDISTILL_DB="$RUNNER_TEMP/studio-test.sqlite3"
+          python -m rpdistill --db "$RPDISTILL_DB" download-enqueue fixture/model --revision aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --reviewed-license apache-2.0 --max-bytes 1024 --cache-dir "$RUNNER_TEMP/studio-cache"
+          xvfb-run -a npm run smoke -- --disable-dev-shm-usage
