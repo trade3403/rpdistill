@@ -52,3 +52,8 @@ E3.1 修复标准 CI 45588726018 8/8 成功，但真实 Europe PMC 45588726112 �
 最新 E3.1 代码 97d7c3a6aaca1a88e73d514bacca9e33f03cb7bc：标准 CI 45589377280 8/8 通过，联网 45589377415 首次 attempt 中 NCBI PMC 实测 3 条成功入库，Europe PMC HTTP 503 失败。已请求仅重跑失败 job。此次仅更新文档，无功能代码变化；核验文档提交标准 CI 与代码 SHA 的联网 run，全部通过才进入 E3.2，或由用户明确授权改变外部服务门槛。不得将 NCBI 成功等同 Europe PMC 恢复。
 
 E3.1 最新修复：标准 CI 45592551774 8/8 通过，双来源联网 45589377415 attempt 3 中 Europe PMC HTTP 503，NCBI PMC 成功。按官方 REST 文档修复 sort=P_PDATE_D desc，FIRST_PDATE 范围筛选保留，新增请求契约测试（累计 74 个）。根因未确认，需核验最新代码 SHA 对应标准 CI 和双来源真实联网全部成功才进入 E3.2。
+
+
+最新用户授权覆盖历史门槛：暂缓 Europe PMC 论文检索，不再阻塞其他开发，保留独立手动真实失败测试。标准 CI 45592551774 8/8、NCBI 联网 45589377415 success；Europe PMC attempt 3 failure。E3.2 fulltext.py 官方 PMC OAI-PMH 先 pmc_fm 再 pmc，双重许可与身份核验、预算、XML 文件库、SHA256、持久状态，累计 81 测试方法。需核验最新标准 CI 与常规 NCBI 检索/全文联网；Europe PMC skipped 不计通过，后续单独复验。全文待内容权利复核，不直接训练。下一阶段 E3.3 解析/分段及语料生成，其他来源后续扩展。
+
+并发修复合并说明：保留 6c37e2d90623806b62baafb3a9cac59e8dd50b01 的 Europe PMC 排序字段修复及测试；其标准 CI 45596188128、双来源联网 45596188201 已通过。此前失败为历史记录，最新 Europe PMC 已实测恢复。按用户要求仍暂缓其常规联网门槛，NCBI PMC 为默认来源，Europe PMC 可手动复验。E3.2 新提交待验收。

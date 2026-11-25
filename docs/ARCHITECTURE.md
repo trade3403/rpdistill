@@ -40,3 +40,5 @@ E1.1 仅实现标准库基础配置和 CLI；以上其余模块为计划。
 `PaperQuery` 构造有界 Europe PMC 官方 REST 查询，`discover` 分页检查记录并入库 `PaperCatalog`。DOI/PMCID/source ID 去重，标识冲突不自动合并，许可冲突降级。只存元数据（不存摘要），默认 OA 筛选。CC BY/CC0+OA+PMCID 仅标为 pending_fulltext_license；E3.2 必须复核具体全文许可及第三方内容限制，不自动将发现结果用于训练。检索领域先覆盖生命科学/医学，其他来源后续扩展。参考 https://europepmc.org/RestfulWebService 。
 
 E3.1 增加 NCBI PMC E-utilities 备用来源：ESearch（OA 与 CC BY/CC0 搜索过滤）→ ESummary → PaperCatalog，保留来源及查询筛选证据，不伪造具体许可；只在 Europe PMC 首次请求瞬态失败时自动切换，部分成功后失败不重新消耗预算。官方文档 https://pmc.ncbi.nlm.nih.gov/about/userguide/ 。后续全文优先当前 PMC OAI-PMH/Cloud 官方接口，旧 OA Web Service 已退役，参见 https://pmc.ncbi.nlm.nih.gov/tools/developers/ 与 https://pmc.ncbi.nlm.nih.gov/about/new-in-pmc/ 。
+
+E3.2：NCBI PMC 默认，Europe PMC 暂缓。FulltextLibrary 消费 PaperCatalog 候选，经官方 OAI-PMH pmc_fm→pmc 验证身份及许可 URI，一致才原子保存原始 XML 并记录哈希、来源、许可、状态。SQLite 单篇写事务串行，累计响应字节及单篇大小限制，缓存基于哈希。原始 XML 状态 downloaded_pending_content_review，E3.3 需排除第三方限制材料，保持署名和许可，不自动训练。官方：https://pmc.ncbi.nlm.nih.gov/tools/oai/ 。

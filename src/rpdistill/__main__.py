@@ -16,6 +16,7 @@ from .modelscope_source import search_models, revisions, download_modelscope
 from .inference import TranslationOptions, load_teacher
 from .papers import PaperQuery, PaperCatalog
 from .ncbi_papers import discover_with_source
+from .fulltext import FulltextLibrary
 
 
 def runtime_info() -> dict[str, str]:
@@ -25,7 +26,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E3.1",
+        "stage": "E3.2",
     }
 
 
@@ -97,9 +98,15 @@ def parser() -> argparse.ArgumentParser:
     papers.add_argument("--language", default="eng")
     papers.add_argument("--limit", type=int, default=100)
     papers.add_argument("--include-closed", action="store_true")
-    papers.add_argument("--provider", choices=["auto", "europe-pmc", "ncbi-pmc"], default="auto")
+    papers.add_argument("--provider", choices=["auto", "europe-pmc", "ncbi-pmc"], default="ncbi-pmc")
     listing = commands.add_parser("paper-list")
     listing.add_argument("--limit", type=int, default=100)
+    download = commands.add_parser("paper-download")
+    download.add_argument("--root", default=str(Path.home()/".rpdistill"/"papers"))
+    download.add_argument("--max-bytes", type=int, required=True)
+    download.add_argument("--limit", type=int, default=20)
+    texts = commands.add_parser("paper-fulltexts")
+    texts.add_argument("--root", default=str(Path.home()/".rpdistill"/"papers"))
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -116,6 +123,11 @@ def main(argv=None) -> int:
                                subject=args.subject, language=args.language or None,
                                limit=args.limit, open_access_only=not args.include_closed)
             result = discover_with_source(query, PaperCatalog(args.db), source=args.provider)
+        elif args.command == "paper-download":
+            result = FulltextLibrary(args.db, args.root).download(PaperCatalog(args.db).list(500),
+                max_bytes=args.max_bytes, limit=args.limit)
+        elif args.command == "paper-fulltexts":
+            result = FulltextLibrary(args.db, args.root).list()
         elif args.command == "paper-list":
             result = PaperCatalog(args.db).list(args.limit)
         elif args.command == "teacher-translate":

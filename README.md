@@ -87,3 +87,9 @@ E3.1 备用来源：paper-search --provider auto（默认）在 Europe PMC 首�
 E3.1 最新代码验收：标准 CI 8/8 通过，NCBI PMC 真实检索 3 条并成功入库；Europe PMC 仍返回 HTTP 503，已请求仅重跑失败任务。E3.2 尚未开始，具体记录见 PROGRESS.md。
 
 Europe PMC 日期检索按 FIRST_PDATE 筛选，使用官方 P_PDATE_D desc 排序（打印出版日期），不保证按首次发表日期全局严格排序。修复版待 CI 及真实联网复验。
+
+
+### E3.2 全文自动下载
+用户授权暂缓 Europe PMC，NCBI PMC 成为 CLI 默认论文来源；Europe PMC 代码及真实测试保留（手动触发，不参与常规推进门槛）。`python -m rpdistill paper-download --max-bytes 8388608 --limit 3` 依照已入库候选通过官方 OAI-PMH `pmc_fm` → `pmc` 获取元数据再获取全文；检查 PMCID/DOI、明确 CC BY/CC0 许可证 URI、记录时间及前后许可一致性。仅保存通过检查的 XML，哈希、来源、许可及状态写入 SQLite。`python -m rpdistill paper-fulltexts` 查看记录。每次最多 50 候选、单响应最多 16 MiB、累计接收字节预算（含元数据，超限探测最多额外 1 字节）、逐篇单线程；同一库不要多进程或跨数据库共用目录。原始 XML 可能包含第三方内容，不标为训练可用；E3.3 必须排除无授权内容并保留署名。默认 CLI 检查前 500 条目录记录，后续增加分页和持续调度。官方规范 https://pmc.ncbi.nlm.nih.gov/tools/oai/ 。
+
+并发修复合并说明：保留 6c37e2d90623806b62baafb3a9cac59e8dd50b01 的 Europe PMC 排序字段修复及测试；其标准 CI 45596188128、双来源联网 45596188201 已通过。此前失败为历史记录，最新 Europe PMC 已实测恢复。按用户要求仍暂缓其常规联网门槛，NCBI PMC 为默认来源，Europe PMC 可手动复验。E3.2 新提交待验收。

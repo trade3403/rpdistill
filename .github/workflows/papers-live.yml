@@ -7,12 +7,16 @@ on:
       - 'scripts/papers_smoke.py'
       - 'src/rpdistill/ncbi_papers.py'
       - 'scripts/ncbi_papers_smoke.py'
+      - 'src/rpdistill/fulltext.py'
+      - 'scripts/fulltext_smoke.py'
       - '.github/workflows/papers-live.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   europe-pmc:
+    # Explicitly deferred by user; manual workflow runs retain real failure status.
+    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
@@ -33,3 +37,14 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -e .
       - run: python scripts/ncbi_papers_smoke.py
+
+  ncbi-fulltext:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e .
+      - run: python scripts/fulltext_smoke.py

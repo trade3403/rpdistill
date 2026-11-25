@@ -33,7 +33,8 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E2.2b1 | ModelScope 基础搜索、固定版本下载与注册 | CPU CI 六环境通过 |
 | E2.2b2 | HF 字节进度/Range、SDK 兼容及联网 smoke | 9/9 CI 通过 |
 | E2.3 | 教师加载翻译、真实微型 CPU 推理 | 10/10 CI 通过 |
-| E3.1 | Europe PMC 论文检索、许可预筛、元数据去重 | 已提交，待 CI |
+| E3.1 | NCBI PMC / Europe PMC 检索、许可预筛、去重 | 并发修复后双来源联网及标准 CI 通过；Europe PMC 按用户要求暂缓 |
+| E3.2 | 全文 XML 下载与许可复核 | 已提交，待 CI |
 | E3 后续 | 全文许可复核、下载、解析及语料生成 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -110,3 +111,9 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E3.1 Europe PMC 排序参数修正
 文档提交 5ddb3b25f10cd7cb17635b74fae18e4334d7fbcf 的标准 CI 45592551774 8/8 success；联网 run 45589377415 attempt 3 再次 failure，Europe PMC job 139138835459 HTTP 503，NCBI PMC success。进一步对照 Europe PMC REST 官方 Sorting Results（https://staging.europepmc.org/RestfulWebService）及公开 EBI-Metabolights 实例，修正 sort 从 FIRST_PDATE desc 为 P_PDATE_D desc；保留 FIRST_PDATE 日期范围过滤，保留真实联网断言、重试与原验收门槛。打印出版日期排序与首次发表日期筛选语义不同，不承诺按首次发表日期全局严格排序。新增请求契约测试 1 项，累计 74 个测试方法。503 是否由旧排序字段引起尚未确认；新提交待两套 CI 实测。未进入 E3.2。
+
+
+## E3.1 授权暂缓与 E3.2
+用户明确要求跳过 Europe PMC 论文检索先做其他功能。最新文档 CI 45592551774 8/8 success；联网 run 45589377415 attempt 3：NCBI PMC success、Europe PMC failure，保留真实失败记录，不认定为通过。Europe PMC job 改为手动 workflow_dispatch，常规推进要求其余标准 CI 及 NCBI 联网全部通过。NCBI PMC 成为默认 CLI 来源。E3.2 新增 fulltext.py、官方 OAI-PMH pmc_fm 预检与 pmc 全文下载、明确 CC BY/CC0 URI、标识/记录日期/许可一致性检查、预算、原子文件保存、哈希与 SQLite 状态、缓存复用。新增 8 测试方法累计 81，新增真实小规模全文 smoke（8 MiB，最多 3 候选），待 CI。原始全文不是训练授权，第三方材料和内容过滤留 E3.3，PDF 下载及多来源后续。未运行真实 GPU 或下载大型模型。下一步核验 E3.2 CI，再进入解析分段及双语语料生成。
+
+并发修复合并说明：保留 6c37e2d90623806b62baafb3a9cac59e8dd50b01 的 Europe PMC 排序字段修复及测试；其标准 CI 45596188128、双来源联网 45596188201 已通过。此前失败为历史记录，最新 Europe PMC 已实测恢复。按用户要求仍暂缓其常规联网门槛，NCBI PMC 为默认来源，Europe PMC 可手动复验。E3.2 新提交待验收。
