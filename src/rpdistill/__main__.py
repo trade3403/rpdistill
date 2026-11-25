@@ -32,6 +32,7 @@ from .compression import plan as compression_plan, create_candidate
 from .compression_review import RegressionGate, compare_candidates
 from .model_export import export_plan, export_candidate, verify_package
 from .rust_parity import rust_parity
+from .export_review import review_integration
 
 
 def runtime_info() -> dict[str, str]:
@@ -41,7 +42,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E9b1",
+        "stage": "E9b2",
     }
 
 
@@ -342,6 +343,17 @@ def parser() -> argparse.ArgumentParser:
     parity.add_argument("--executable",required=True,help="Trusted locally built diagnostic Rust bridge")
     parity.add_argument("--timeout-seconds",type=int,default=180)
     parity.add_argument("--output",required=True)
+    integration=commands.add_parser("student-review-integration")
+    for flag in ("root","checkpoint","benchmark","student-report","baseline-report",
+                 "packet","key","reviews","expected-package-id","reviewed-dataset",
+                 "reviewed-teacher-license","reviewed-model-license","rights-note",
+                 "reviewer","executable","output"):
+        integration.add_argument("--"+flag,required=True)
+    integration.add_argument("--acknowledge-local-candidate-only",action="store_true")
+    integration.add_argument("--training-limit",type=int,default=1000)
+    integration.add_argument("--max-cases",type=int,default=1000)
+    integration.add_argument("--max-seconds",type=float,default=3600)
+    integration.add_argument("--parity-timeout",type=int,default=180)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -355,6 +367,21 @@ def main(argv=None) -> int:
             result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
             path=write_new(args.output,result)
             result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "student-review-integration":
+            if Path(args.output).exists() or Path(args.output).is_symlink():
+                raise ValueError("output must be a new file")
+            result=review_integration(args.db,args.root,args.checkpoint,read_json(args.benchmark),
+                read_json(args.student_report),read_json(args.baseline_report),
+                read_json(args.packet),read_json(args.key),read_json(args.reviews),
+                expected_package_id=args.expected_package_id,reviewed_dataset=args.reviewed_dataset,
+                reviewed_teacher_license=args.reviewed_teacher_license,
+                reviewed_model_license=args.reviewed_model_license,rights_note=args.rights_note,
+                reviewer=args.reviewer,executable=args.executable,
+                acknowledge_local_candidate_only=args.acknowledge_local_candidate_only,
+                training_limit=args.training_limit,max_cases=args.max_cases,max_seconds=args.max_seconds,
+                parity_timeout=args.parity_timeout)
+            path=write_new(args.output,result)
+            result={k:v for k,v in result.items() if k not in ("quality_review","rust_diagnostics")}|{"path":path}
         elif args.command == "student-rust-parity":
             if Path(args.output).exists() or Path(args.output).is_symlink():
                 raise ValueError("output must be a new file")

@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'src/rpdistill/model_export.py'
+      - 'src/rpdistill/export_review.py'
+      - 'src/rpdistill/quality_review.py'
+      - 'src/rpdistill/evaluation.py'
       - 'src/rpdistill/rust_parity.py'
       - 'scripts/rpdistill_candidate_infer.rs'
       - 'src/rpdistill/student.py'

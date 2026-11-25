@@ -31,7 +31,7 @@
 | E8b | 同冻结 benchmark 量化前后真实质量回归与候选选择；原生量化、INT4 与剪枝须验证 D 线支持 |
 | E9a | 独立自训练 FP32 诊断候选包、资产/来源/许可/版本哈希、完整尺寸 Rust raw reader 对照 |
 | E9b1 | 独立候选包可信 pin 诊断桥、真实 Rust Encoder/Decoder/full+cached logits 与 greedy 对照 |
-| E9b2 | 质量及权利审批与导出衔接、生产加载入口集成协调，不冒用官方模型身份 |
+| E9b2 | 导出候选源权重、权利与质量复核、实际生成重放、Rust 诊断和独立集成凭据；生产入口协调见 PRODUCTION_INTEGRATION.md（未接入） |
 | E10 | 按性能剖析逐步引入 Rust 高性能数据处理和自主计算；不强制重写 PyTorch |
 | E11 | Electron/React/TypeScript GUI、模型/语料/论文采集与下载中心/任务/监控/评测/导出界面、暂停恢复、远程训练管理 |
 | E12 | 从自动检索到真实蒸馏与导出的无人值守端到端验收； 完整安装包、真实 GPU 蒸馏、质量及性能对照、综合发布验收 |

@@ -17,6 +17,7 @@ from rpdistill.distill import DistillConfig,train_sequence,save_checkpoint
 from rpdistill.training_data import acquire_assets,ASSET_BYTES
 from rpdistill.model_export import export_candidate,verify_package,REQUIRED_BYTES,PAYLOAD
 from rpdistill.rust_parity import rust_parity
+from rpdistill.export_review import verify_source_weights
 
 torch.set_num_threads(2)
 exe=Path(sys.argv[1]).resolve()
@@ -42,6 +43,19 @@ with tempfile.TemporaryDirectory() as tmp:
     m=verify_package(root/"candidate",expected_package_id=package["package_id"])
     assert m["origin"]["checkpoint_id"]==source["checkpoint_id"]
     assert m["release_ready"] is False and m["plan"]["rust_deployable"] is False
+    replay_model,replay_source=verify_source_weights(root/"candidate",root/"checkpoint",m)
+    assert replay_source["checkpoint_id"]==source["checkpoint_id"]
+    del replay_model
+    # A valid candidate cannot be paired with a different claimed source.
+    try:
+        verify_source_weights(root/"candidate",root/"checkpoint",
+            m|{"origin":m["origin"]|{"checkpoint_id":"0"*64}})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("wrong source checkpoint accepted")
+    print(json.dumps({"all_package_tensors_match_source":True,"wrong_source_binding_rejected":True}))
+
     expected=hashlib.sha256()
     weights=root/"candidate"/"weights.safetensors"
     with safe_open(str(weights),framework="pt",device="cpu") as f, safe_open(
