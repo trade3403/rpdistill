@@ -104,3 +104,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E3.1 重试验收与备用来源
 提交 e2cfef89cc08b6bca1636fcf6ad9258abbf07a97 对应 [标准 CI 45588726018](https://github.com/trade3403/rpdistill/actions/runs/45588726018) 8/8 通过；[论文联网 45588726112](https://github.com/trade3403/rpdistill/actions/runs/45588726112) 仍失败，日志显示 HTTP 503 重试耗尽。新增 ncbi_papers.py：NCBI PMC 官方 ESearch/ESummary、语言与日期、OA/CC BY/CC0 查询过滤、PMCID/DOI、目录去重、可选自动备用来源（仅首个请求暂时失败，无部分检索预算重置），报告原失败原因。新增 7 个单元测试，累计 73 个。保留 Europe PMC 独立真实测试，增加 NCBI PMC 独立联网 smoke，均须核验，不把备用成功当作 Europe PMC 恢复。NCBI 许可筛选不等于具体全文许可，待 E3.2 验证。未进入 E3.2。新提交待 CI。
+
+## E3.1 双来源实际验收（仍有阻塞）
+代码提交 97d7c3a6aaca1a88e73d514bacca9e33f03cb7bc：[标准 CI 45589377280](https://github.com/trade3403/rpdistill/actions/runs/45589377280) 8/8 success；[双来源联网 45589377415](https://github.com/trade3403/rpdistill/actions/runs/45589377415) 首次 attempt：NCBI PMC job 139119203251 success（实际日志 inspected=3, inserted=3, duplicate=0, conflict=0, invalid=0），Europe PMC job 139119202890 failure（HTTP 503，重试后仍失败）。已确认官方 REST URL 与公开文档一致；官方论坛曾报告 HTTP 503 与流量上升，但本次具体原因未知。未改变验收门槛或测试代码，已成功请求仅重跑此 workflow 的失败 job；等待实际结果。文档提交单独触发标准 CI，论文联网结果仍以对应代码 SHA 的上述 run 为准。E3.2 尚未启动。若持续不可用，需用户明确同意调整外部服务验收门槛，不能直接将失败判为通过。
