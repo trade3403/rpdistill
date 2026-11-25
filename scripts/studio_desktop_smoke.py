@@ -1,6 +1,6 @@
-"""Native Windows/macOS desktop launch and real persisted queue IPC smoke.
+"""Native Windows desktop launch and real persisted queue IPC smoke.
 
-Linux GUI is explicitly out of scope; backend Linux tests remain independent.
+Linux and macOS GUI are out of scope; their backend tests remain independent.
 Uses isolated temporary files and the actual local Python executable.
 """
 import os
@@ -11,8 +11,8 @@ import tempfile
 
 
 def main():
-    if sys.platform not in ("win32", "darwin"):
-        raise SystemExit("Desktop smoke supports Windows/macOS only")
+    if sys.platform != "win32":
+        raise SystemExit("Desktop smoke supports Windows only")
     desktop = Path(__file__).resolve().parents[1] / "desktop"
     cli = desktop / "node_modules" / "electron" / "cli.js"
     if not cli.is_file():
