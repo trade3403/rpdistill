@@ -17,3 +17,7 @@ python -m unittest discover -s tests -v
 研发计划：[ROADMAP](docs/ROADMAP.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [HANDOFF](docs/HANDOFF.md)
 
 公开仓库不提交私有论文、模型权重、API 密钥或训练数据。使用教师模型前须核查模型许可证与训练数据使用权限。
+
+## 功能与进度
+- [完整功能清单（FEATURES.md）](docs/FEATURES.md)
+- [研发进度与 CI 验收台账（PROGRESS.md）](docs/PROGRESS.md)
