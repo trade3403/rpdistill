@@ -38,7 +38,8 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E3.3a | JATS 解析、候选双语语料 | 10/10 必需 CI 通过（337 段实测） |
 | E3.3b | 数据集候选版本与单次自动采集翻译调度 | 标准 CI 8/8 通过 |
 | E4a | D 线审计、Marian 学生架构及权重契约 | 标准 9/9 + Hub 2/2 CI 通过 |
-| E4b | 固定真实分词器、候选训练批次及损失掩码 | 已提交，待 CI |
+| E4b | 固定真实分词器、候选训练批次及损失掩码 | 标准 9/9 + tokenizer 1/1 CI 通过 |
+| E5a | 真实序列级蒸馏与权重检查点 | 已提交，待 CI |
 | E3 后续 | 全文许可复核、下载、解析及语料生成 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -136,3 +137,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E4a 验收与 E4b
 提交 4250379ba05c096073e11952a859617faabb1d3b：[标准 CI 45603053723](https://github.com/trade3403/rpdistill/actions/runs/45603053723) 9/9、[Hub 联网 45603053807](https://github.com/trade3403/rpdistill/actions/runs/45603053807) 2/2 success；真实学生小网络前向与完整尺寸 256 张量初始化通过。E4b training_data.py：5 个固定哈希小资产自动下载，不下载权重；从 candidate snapshot 检查完整版本/成员/当前全文哈希许可预筛，选定 split 进行分词，动态 batch、mask/decoder shift/labels=-100、token/logits 预算；CLI student-assets/student-batch-plan。新增 5 个单元测试方法（4 training_data + 1 snapshot），真实 CPU smoke 增加 masked loss 对照；新增真实固定资产 Python/HF/Rust 三方 ID 对照 workflow，D 线 checkout 固定审计 SHA 只读。新 CI 待验收。候选数据仍 training_ready=false，未更新模型权重、未测试真实 Qwen/GPU；正式训练权利/语义质量门槛、完整自动调度及自训练包部署留后续。
+
+## E4b 验收与 E5a
+提交 c7871527b66b78377eab4a019969f866fce06e8e：[标准 CI 45604907365](https://github.com/trade3403/rpdistill/actions/runs/45604907365) 9/9、[分词器 45604907414](https://github.com/trade3403/rpdistill/actions/runs/45604907414) 1/1 success。job 139173180582 下载 5 资产 3230522 bytes、10/10 三方 network IDs 一致、0 unknown rejection、未下载权重；job 139173180974 masked loss 3.4788079261779785、5 supervised tokens，与显式 CE 一致。E5a distill.py 新增 DistillConfig、真实 CPU FP32 AdamW/反传/梯度裁剪、确定性 shuffle/seed、token 加权 eval loss、SafeTensors 不覆盖检查点（权重、历史、来源、配置、哈希）及安全重载；student-distill CLI 要求操作者确认精确候选版本内容权利/质量与注册教师许可，使用 train split 且当前资格/哈希/分词通过、达到计数门槛。新增 3 个单元测试方法与真实 tiny CPU synthetic-target 80-step 训练 smoke（实际参数变化、loss 降低至少 50%、权重/ logits roundtrip、损坏及覆盖拒绝）；待 CI。未运行真实 Qwen 译文蒸馏或完整尺寸训练，无准确率声明。只权重 checkpoint，不保存优化器和 RNG，无精确续训；E6 添加真实 CUDA、资源预算、混合精度、积累、持久训练状态和精确恢复。自动触发仅在权利/质量授权及正式数据门槛完成后；无 logits/feature 蒸馏跨分词器假设。

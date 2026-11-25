@@ -108,3 +108,6 @@ E3.3b 标准 CI 8/8 已通过；E4a 依据 D 线固定提交审计 Marian 6+6 �
 
 ### E4b 固定分词器与候选训练批次
 E4a 4250379 标准 CI 9/9、Hub 2/2 成功。`student-assets --root PATH --max-bytes 4194304` 自动获取固定 OPUS-MT revision 的 5 个配置/分词器文件（仅约 3.23 MB，不下载权重），哈希校验、限额、缓存、有限重试。`student-batch-plan VERSION --assets PATH --split train` 从不可覆盖候选快照验证版本/成员/当前全文资格与哈希，分词、动态 padding、源和 decoder mask、shift-right labels=-100 忽略填充、按 token/logits 限制构建批次。报告仅候选计划 training_ready=false；不更新权重。CI 增加固定真实 SPM/网络词表与 Python MarianTokenizer、D 线固定 Rust 分词器三方对照，以及微型 Marian masked CE loss 验证。D 仓库只读，不下载大型模型。仍需 E5 权重更新和正式训练授权、完整质量复核，E9 自训练包 Rust 验收。
+
+### E5a 序列级蒸馏（CPU FP32）
+E4b c787152 标准 CI 9/9、真实分词器 CI 1/1 通过：5 个固定资产共 3,230,522 bytes，10/10 三方 ID 一致；真实 masked loss 3.4788079261779785（合成样本，非质量指标）。E5a `student-distill VERSION --assets PATH --output NEW_DIR --reviewed-dataset VERSION --reviewed-teacher-license LICENSE --steps 20` 仅在操作者明确核查该版本内容权利、教师蒸馏权利及译文质量后使用，不能自动认定候选数据已认证。固定 Marian 学生随机初始化，train split only，CPU FP32 AdamW/交叉熵/反向传播/梯度裁剪/步数上限、实际损失历史、SafeTensors 权重检查点及 SHA256/严格形状复核。检查点只保存权重及训练记录，不保存 optimizer/RNG，不支持精确断点续训，不是 RPModel 部署包。CI 真实微型 CPU 权重更新、合成样本 loss 下降、权重与 logits roundtrip、损坏拒绝，待验收。正式 GPU、混合精度、梯度累积、精确续训、持久调度在 E6；真实教师译文质量与独立评测在本机/E7。无需下载大型权重。

@@ -50,3 +50,5 @@ E3.3b DatasetStore 保存不可覆盖的内容寻址候选快照与成员，按�
 E4a：student.py 固定 D 线 Marian 6+6/512/8/2048/65001 契约，PyTorch 训练侧随机初始化、canonical 权重验证、固定 SPM/词表文件校验及共享 network ID 映射；测试小 profile 不作为部署模型。真实 Rust loader 当前固定官方来源及哈希，E9 需自训练 package profile；见 STUDENT_CONTRACT.md。
 
 E4b training_data.py：固定 tokenizer assets 下载与完整性；DatasetStore 不可变候选成员→当前全文/许可元数据/版本校验→StudentCodec→按 split 和 token/logits 预算组 batch，labels padding=-100、Marian decoder start PAD 保持 attention=1。训练计划不更新参数或认证数据；E5 接真实训练器。
+
+E5a distill.py：经过操作者明确复核的候选版本 train split→StudentCodec→masked batch→Marian CPU FP32→CE/AdamW/backprop/grad clipping→真实 loss history→不可覆盖 SafeTensors 权重检查点与哈希 manifest。加载严格校验 canonical tensors/alias、恢复权重并重现 logits。仅权重恢复，不是 optimizer/RNG 精确恢复或 Rust 部署格式；E6 继续完整训练状态。合成微型 CPU 真实训练 smoke 非真实翻译质量。

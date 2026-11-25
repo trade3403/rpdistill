@@ -57,3 +57,5 @@ E3.3a CI 10/10 必需任务通过，真实提取 337 段。E3.3b F09/F21：候�
 E3.3b 标准 CI 8/8 通过。E4a 学生模型审计、Marian 网络与权重形状验证已提交待 CI；真实 tokenizer 对照、训练及 Rust 自训练包部署尚未完成。
 
 E4a 标准与 Hub CI 11/11 success。E4b 固定分词器自动下载、训练数据候选版本读取与动态批次/损失 mask 已提交待 CI，新增真实 Rust/Python/HF 分词 ID 对照；权重更新在 E5。
+
+E4b 标准与 tokenizer CI 10/10 success（10/10 真实分词 ID）。E5a 序列级 CPU 蒸馏、权重更新、实际 loss 和安全权重检查点已提交待 CI；精确优化器/RNG 恢复、GPU 与正式质量认证待后续。

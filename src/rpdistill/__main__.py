@@ -22,6 +22,7 @@ from .datasets import DatasetStore, DatasetGate
 from .pipeline import CorpusPipeline
 from .student import contract as student_contract, checked_assets
 from .training_data import acquire_assets, batch_plan
+from .distill import DistillConfig, train_reviewed_snapshot
 
 
 def runtime_info() -> dict[str, str]:
@@ -31,7 +32,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E4b",
+        "stage": "E5a",
     }
 
 
@@ -177,6 +178,23 @@ def parser() -> argparse.ArgumentParser:
     batch.add_argument("--batch-size",type=int,default=4)
     batch.add_argument("--max-padded-tokens",type=int,default=4096)
     batch.add_argument("--max-logits",type=int,default=16777216)
+    train = commands.add_parser("student-distill")
+    train.add_argument("version")
+    train.add_argument("--assets",required=True)
+    train.add_argument("--output",required=True)
+    train.add_argument("--reviewed-dataset",required=True,
+        help="Exact dataset version after operator review of content rights and translation quality")
+    train.add_argument("--reviewed-teacher-license",required=True,
+        help="Registered teacher license after reviewing intended distillation rights")
+    train.add_argument("--steps",type=int,default=20)
+    train.add_argument("--batch-size",type=int,default=1)
+    train.add_argument("--learning-rate",type=float,default=1e-4)
+    train.add_argument("--weight-decay",type=float,default=0.01)
+    train.add_argument("--max-grad-norm",type=float,default=1.0)
+    train.add_argument("--seed",type=int,default=42)
+    train.add_argument("--max-padded-tokens",type=int,default=4096)
+    train.add_argument("--max-logits",type=int,default=16777216)
+    train.add_argument("--limit",type=int,default=1000)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -186,6 +204,13 @@ def main(argv=None) -> int:
     try:
         if args.command in (None, "info"):
             result = runtime_info()
+        elif args.command == "student-distill":
+            config=DistillConfig(steps=args.steps,batch_size=args.batch_size,learning_rate=args.learning_rate,
+                weight_decay=args.weight_decay,max_grad_norm=args.max_grad_norm,seed=args.seed,
+                max_padded_tokens=args.max_padded_tokens,max_logits=args.max_logits)
+            result=train_reviewed_snapshot(args.db,args.version,args.assets,args.output,
+                reviewed_dataset=args.reviewed_dataset,reviewed_teacher_license=args.reviewed_teacher_license,
+                config=config,limit=args.limit)
         elif args.command == "student-assets":
             result=acquire_assets(args.root,max_bytes=args.max_bytes)
         elif args.command == "student-batch-plan":
