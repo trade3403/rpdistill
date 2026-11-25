@@ -1,7 +1,7 @@
 # RPDistill 研发进度与验收台账
 
 更新时间：2026-11-25（更新）
-仓库：trade3403/rpdistill；分支：main；版本：V0.1.0；当前阶段：E1.1 CPU CI 已通过，E1.2 CPU CI 六环境已通过；E2.1 CPU CI 六环境已通过；E2.2a CPU CI 六环境已通过；E2.2b1 CPU CI 六环境通过；E2.2b2 已提交待验收。
+仓库：trade3403/rpdistill；分支：main；版本：V0.1.0；当前阶段：E1.1 CPU CI 已通过，E1.2 CPU CI 六环境已通过；E2.1 CPU CI 六环境已通过；E2.2a CPU CI 六环境已通过；E2.2b1 CPU CI 六环境通过；E2.2b2 标准 CI/联网 smoke 9/9 通过；E2.3 已提交待验收。
 
 ## 当前阶段
 
@@ -31,8 +31,8 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E2.1 | 教师在线检索、下载校验与注册 | CPU CI 六环境通过 |
 | E2.2a | 持久化队列、文件级校验进度、协作控制 | CPU CI 六环境通过 |
 | E2.2b1 | ModelScope 基础搜索、固定版本下载与注册 | CPU CI 六环境通过 |
-| E2.2b2 | HF 字节进度/Range、SDK 兼容及联网 smoke | 已提交，待验收 |
-| E2.3 | 教师加载翻译 | 待开发 |
+| E2.2b2 | HF 字节进度/Range、SDK 兼容及联网 smoke | 9/9 CI 通过 |
+| E2.3 | 教师加载翻译、真实微型 CPU 推理 | 已提交，待 CI |
 | E3 | 科研语料生成清洗 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -53,7 +53,7 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 
 ## 下一步
 
-核验 E2.2b1 CI，随后 E2.2b2 SDK 实际联网与字节级进度，再 E2.3 与 E3。
+核验 E2.3 标准 CI 与真实微型 CPU 推理 job，全部成功后进入 E3.1 论文检索及许可过滤。
 
 ## 强制维护约定
 
@@ -91,3 +91,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E2.2b1 验收及 E2.2b2
 提交 45fcba663c68c09593d988c7333053f7e7479546 对应 [CI 45585519890](https://github.com/trade3403/rpdistill/actions/runs/45585519890) 六环境全部 success。E2.2b2 新增 transfer.py、队列 network_bytes/network_rate 字段迁移、Hugging Face 固定 revision 逐块 HTTPS 传输、SHA-256 部分文件 Range 恢复、块间控制、真实本地 HTTP socket 测试；新增 7 个测试方法，累计 46 个。CI 新增 SDK 安装兼容 job，独立 hub-live.yml 执行 HF 公共小配置（64 KiB 上限）及 ModelScope 在线搜索。待核验两个 workflow。未下载真实模型权重；ModelScope 字节进度、队列 streaming 集成专项测试、真实大文件中断恢复待补，外网失败不能伪报通过。下一步先检查本次 CI/联网 smoke，再推进教师翻译。
+
+## E2.2b2 验收与 E2.3 开发
+提交 dbe106f1c112215e884cce9e30f6c1ab8c45a86e：[标准 CI 45586043352](https://github.com/trade3403/rpdistill/actions/runs/45586043352) 7/7、[联网 smoke 45586043462](https://github.com/trade3403/rpdistill/actions/runs/45586043462) 2/2 全部 success。仅小配置下载及真实检索，无真实大模型下载。E2.3 新增 inference.py、注册表精确版本查询、清单再校验、本地 SafeTensors 加载、CPU/CUDA 显式选择、确定性生成、输入/输出 token 预算、批量翻译及来源元数据；新增 6 个单元测试方法，累计 52 个。CI 新增实际 PyTorch CPU 随机微型模型推理，不下载预训练权重；本次新提交仍待 CI。Qwen 具体版本、真实翻译质量、GPU/显存实测待用户电脑及 E7；ModelScope 字节级控制仍待完善。下一步 E3.1 论文搜索及许可过滤。

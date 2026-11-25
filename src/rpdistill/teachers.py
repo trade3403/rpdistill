@@ -176,6 +176,16 @@ class TeacherRegistry:
                 (teacher.model_id, teacher.revision, json.dumps(record, allow_nan=False)))
         return record
 
+    def get(self, model_id, revision):
+        validate_id(model_id)
+        validate_revision(revision)
+        with closing(sqlite3.connect(self.db_path)) as db:
+            row = db.execute(f'SELECT record FROM {self.table} WHERE model_id=? AND revision=?',
+                             (model_id, revision)).fetchone()
+        if row is None:
+            raise KeyError('teacher model not registered')
+        return json.loads(row[0])
+
     def list(self):
         with closing(sqlite3.connect(self.db_path)) as db:
             return [json.loads(row[0]) for row in db.execute(

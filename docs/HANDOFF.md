@@ -2,7 +2,7 @@
 
 仓库：trade3403/rpdistill；主分支 main。原科研 PDF 仓库 A/B/C/D 分支不得修改。
 
-当前 E2.2b1：E2.2a CPU CI 六环境通过；ModelScope 基础适配已提交待 CI。尚未完成真实训练、教师选型、GUI 或模型导出。CI 结果以 GitHub Actions 最新对应提交为准。
+当前 E2.3：E2.2b2 标准 CI 与联网 smoke 9/9 通过；本地教师推理/批量翻译待 CI。
 
 接手步骤：
 1. 查阅本文件、ROADMAP、ARCHITECTURE。
@@ -40,3 +40,5 @@ E2.1 CI 45582334642 已通过 6/6；E2.2a 新增 downloads.py。队列单 worker
 E2.2a CI 45582666202 已成功。E2.2b1 使用独立 ModelScope SDK 可选依赖及来源注册表；下载仅接受公开、已审核许可、完整 SHA 和每文件上游 SHA-256。实时网络速度未实现，真实服务行为未验收。
 
 E2.2b1 CI 45585519890 已通过 6/6。E2.2b2 新增 Hugging Face 队列流式 HTTP 传输、网络计数和 Range 恢复；旧 SDK 直接下载和 ModelScope 保留文件级进度。请先核验标准 CI（6 环境 + SDK 安装）及独立 Public Hub live smoke。后者只测试小 config 与查询，不代表模型下载/推理通过。网络实测、ModelScope 字节进度与 streaming 队列专项测试仍需完善。真实大模型与 GPU 训练在用户电脑进行。
+
+E2.2b2 标准 CI 45586043352 与联网 smoke 45586043462 全部成功。E2.3 inference.py 使用已注册并重新核验的 SafeTensors 本地模型，禁用远程代码，支持显式 CPU/CUDA、批量生成和版本来源记录。新增独立 real-cpu-inference job，随机微型模型不用于质量验收。先核验最新 CI 全部通过，再进入 E3.1 论文检索、合法许可过滤、元数据和去重。真实 Qwen GPU 测试留用户电脑。上下文不足风险出现时提前给用户最新交接 Prompt；未出现风险则继续当前窗口，不要每阶段重复输出交接。

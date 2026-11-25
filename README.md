@@ -5,7 +5,7 @@
 RPDistill 负责教师模型、语料、训练、评测和模型导出。RPTranslate 保持独立 Rust 推理，不依赖训练环境。
 
 ## 当前状态
-E2.2b2：E2.2b1 六环境 CPU CI 已通过；新增 Hugging Face 队列 HTTP 字节进度、Range 恢复与 SDK/联网 smoke（待验收）。尚无真实模型推理或 GPU 训练。
+E2.3：E2.2b2 标准 CI 与真实联网 smoke 全部通过（9/9）；新增本地教师推理及批量翻译接口，待 CI。尚未验证千问真实模型翻译质量或 GPU 训练。
 
 ## 快速开始
 ```sh
@@ -69,3 +69,6 @@ python -m rpdistill model-list --source modelscope
 
 ### E2.2b2 下载监控与联网验收
 Hugging Face 队列默认采用公开固定 revision HTTPS 逐块传输，network_bytes 为本次实际读取的响应体字节（不含缓存或恢复前的字节），network_rate 为最近更新窗口速率；done_bytes 仍为已校验文件字节。支持块间暂停和有上游 SHA-256 的部分文件 Range 恢复，服务器返回 200 时重新下载，不拼接错误范围。无上游哈希的部分文件重新下载。SDK 直接下载 CLI 与 ModelScope 暂保留文件级控制；不并行操作相同缓存目录。标准 CI 增加 SDK 安装/接口检查，独立 Public Hub live smoke 只下载 MIT GPT-2 的小 config（最多 64 KiB）及 ModelScope 查询，不下载权重。真实外网状态独立记录。
+
+### E2.3 本地教师翻译
+安装适合本机 CPU/CUDA 的 PyTorch 后，`python -m pip install -e ".[inference]"`。先使用下载中心注册已核查许可的指令模型（需要 chat template、SafeTensors 和受支持的 causal 架构）。准备 UTF-8 JSON 字符串数组，例如 `["The sample was heated to 300 K."]`，运行 `python -m rpdistill teacher-translate MODEL_ID --revision FULL_SHA --input source.json --source-language English --target-language Chinese --device cpu`。GPU 使用显式 --device cuda:0 及适配 dtype。模型仅本地读取、重新核验清单、禁用远程自定义代码；不截断超长输入。输出为候选翻译及来源/版本，截断或空输出进入待审核，仍需 E3 清洗和 E7 评测。CI 临时创建随机微型模型验证真实 CPU 加载与生成，不测试翻译能力。

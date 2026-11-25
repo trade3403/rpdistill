@@ -13,6 +13,7 @@ from .teachers import TeacherRegistry, search_teachers, download_teacher
 from dataclasses import asdict
 from .downloads import DownloadQueue
 from .modelscope_source import search_models, revisions, download_modelscope
+from .inference import TranslationOptions, load_teacher
 
 
 def runtime_info() -> dict[str, str]:
@@ -22,7 +23,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E2.2b2",
+        "stage": "E2.3",
     }
 
 
@@ -74,6 +75,18 @@ def parser() -> argparse.ArgumentParser:
         cmd.add_argument("id")
         if action == "recover":
             cmd.add_argument("--worker-stopped", action="store_true")
+    translate = commands.add_parser("teacher-translate")
+    translate.add_argument("model_id")
+    translate.add_argument("--revision", required=True)
+    translate.add_argument("--source", choices=["huggingface", "modelscope"], default="huggingface")
+    translate.add_argument("--source-language", default="English")
+    translate.add_argument("--target-language", default="Chinese")
+    translate.add_argument("--device", default="cpu")
+    translate.add_argument("--dtype", default="float32")
+    translate.add_argument("--max-input-tokens", type=int, default=2048)
+    translate.add_argument("--max-new-tokens", type=int, default=1024)
+    translate.add_argument("--batch-size", type=int, default=1)
+    translate.add_argument("--input", required=True, help="UTF-8 JSON array of source strings")
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -85,6 +98,19 @@ def main(argv=None) -> int:
             result = runtime_info()
         elif args.command == "devices":
             result = device_report(args.path)
+        elif args.command == "teacher-translate":
+            input_path = Path(args.input)
+            if input_path.stat().st_size > 8 * 1024 * 1024:
+                raise ValueError("input JSON exceeds 8 MiB; split input")
+            texts = json.loads(input_path.read_text(encoding="utf-8"))
+            if not isinstance(texts, list):
+                raise ValueError("input JSON must be an array of strings")
+            options = TranslationOptions(source_language=args.source_language,
+                target_language=args.target_language, device=args.device, dtype=args.dtype,
+                max_input_tokens=args.max_input_tokens, max_new_tokens=args.max_new_tokens,
+                batch_size=args.batch_size)
+            result = load_teacher(args.db, args.model_id, args.revision, options,
+                                  source=args.source).translate(texts)
         elif args.command.startswith("download-"):
             queue = DownloadQueue(args.db)
             action = args.command.removeprefix("download-")
@@ -130,7 +156,7 @@ def main(argv=None) -> int:
                 result = store.events(args.id)
         print(json.dumps(result, ensure_ascii=True, allow_nan=False))
         return 0
-    except (ValueError, KeyError, OSError) as exc:
+    except (ValueError, KeyError, OSError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
 
