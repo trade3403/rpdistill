@@ -81,3 +81,5 @@ E8b 10/10 CI success。E9a 独立自训练 FP32 候选包、权重与固定分�
 E9a 11/11 CI success，完整尺寸单步合成训练+Rust 312033188 bytes 全读取通过。E9b1 真实 Rust encoder/decoder/full/cached logits 与 greedy 诊断对照已提交待 CI；非生产 loader，质量与权利审批 E9b2。
 
 E9b1 标准及 Rust 专项 11/11 success，真实完整尺寸诊断推理一致。E9b2 本地集成候选审批链及独立凭据已提交待 CI，实际正式人工审批/生产加载/发行未完成。
+
+E9b2 补充双外部 pin 交接校验、签发前权利及包再次核查、完整训练状态 token 数据哈希；真实微型重放与覆盖拒绝、完整尺寸诊断报告拒绝作为审批凭证，待最新 CI。

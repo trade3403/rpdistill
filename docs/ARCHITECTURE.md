@@ -74,3 +74,5 @@ E9a model_export.py：已完成固定 profile checkpoint → canonical FP32 Safe
 E9b1 rust_parity.py：外部 package ID 验证 → 可信本地 Rust diagnostic executable、独立 weight SHA/metadata/pinned assets 验证 → 真实 Marian components/encoder memory/full+cached logits/greedy IDs → Python FP32 同候选对照和报告 hash。固定两 token/mask cases；非生产加载/文本 API，D 只读，E9b2 质量审批与集成。
 
 E9b2 export_review.py：候选 pin 与 source 全张量对照、默认质量/盲评重算、当前训练选择和许可复核、实际逐段生成重放、可信 Rust bridge 重跑、独立不可覆盖 receipt。候选 manifest 不修改；receipt 仅本地集成候选，非认证/发布/生产加载。D 独立 profile 接口协调见 PRODUCTION_INTEGRATION.md。
+
+E9b2 交接：原 export_review.py 继续作为唯一审批实现；签发前复核候选与当前本地训练权利，full-state 校验 token data_sha256。独立 receipt 和 package 的双外部 pin 检查验证绑定及嵌套报告，不重新授权或启动生产模型。

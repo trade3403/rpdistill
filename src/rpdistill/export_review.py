@@ -16,6 +16,7 @@ from .student_evaluation import load_evaluation_model, generate_one, GenerationC
 from .student import FIXED, StudentCodec, canonical_state
 from .distill import prepare_reviewed_snapshot
 from .rust_parity import rust_parity, D_REFERENCE
+from .resumable import SCHEMA as TRAINING_STATE_SCHEMA
 
 
 SCHEMA="rpdistill-integration-review-v1"
@@ -58,6 +59,8 @@ def review_rights(db_path,root,source,manifest,*,reviewed_dataset,reviewed_teach
         limit=training_limit)
     if source["provenance"]!=provenance or not examples:
         raise ValueError("current training provenance differs from checkpoint")
+    if source.get("schema")==TRAINING_STATE_SCHEMA and source.get("data_sha256")!=hash_json(examples):
+        raise ValueError("current training token data differs from checkpoint")
     return {"reviewer":reviewer,"operator_note":rights_note,"dataset":reviewed_dataset,
             "teacher":provenance["teacher"],"teacher_license":reviewed_teacher_license,
             "model_license":reviewed_model_license,"training_selection":provenance["selected"],
@@ -137,6 +140,15 @@ def review_integration(db_path,root,checkpoint,benchmark,student,baseline,packet
         or parity["d_reference"]!=D_REFERENCE or parity["diagnostic_passed"] is not True
         or time.monotonic()>=deadline):
         raise ValueError("Rust diagnostics or review time budget rejected")
+    # Do not publish a receipt if the candidate or local rights record changed
+    # while generation/diagnostics were running. Stable local files are assumed.
+    if verify_package(root,expected_package_id=expected_package_id)!=manifest:
+        raise ValueError("candidate changed during review")
+    current_rights=review_rights(db_path,root,source,manifest,reviewed_dataset=reviewed_dataset,
+        reviewed_teacher_license=reviewed_teacher_license,reviewed_model_license=reviewed_model_license,
+        rights_note=rights_note,reviewer=reviewer,training_limit=training_limit)
+    if current_rights!=rights or time.monotonic()>=deadline:
+        raise ValueError("rights changed or review time budget exhausted")
     receipt={"schema":SCHEMA,"package_id":expected_package_id,
         "weights_sha256":manifest["files"]["weights.safetensors"]["sha256"],
         "checkpoint_id":origin["checkpoint_id"],"training_dataset":origin["training_dataset"],
@@ -149,3 +161,59 @@ def review_integration(db_path,root,checkpoint,benchmark,student,baseline,packet
         "elapsed_seconds":time.monotonic()-start,
         "scope":"local diagnostic integration candidate, not production approval or signature"}
     return receipt|{"receipt_id":hash_json(receipt)}
+
+
+def check_integration_receipt(root,receipt,*,expected_package_id,expected_receipt_id):
+    """Validate a prior local receipt with two independently obtained pins.
+
+    Integrity only: no new review of rights, quality or production loader.
+    """
+    if not valid_id(expected_package_id) or not valid_id(expected_receipt_id):
+        raise ValueError("independent package and receipt pins required")
+    if (not isinstance(receipt,dict) or receipt.get("schema")!=SCHEMA
+        or receipt.get("receipt_id")!=expected_receipt_id
+        or hash_json({k:v for k,v in receipt.items() if k!="receipt_id"})!=expected_receipt_id
+        or receipt.get("package_id")!=expected_package_id
+        or receipt.get("candidate_integration_gate_passed") is not True
+        or any(receipt.get(k) is not False for k in ("production_loader_verified",
+             "reviewer_identity_verified","baseline_identity_verified","distribution_authorized","release_ready"))):
+        raise ValueError("invalid integration receipt identity")
+    manifest=verify_package(root,expected_package_id=expected_package_id)
+    origin=manifest["origin"]
+    if (receipt.get("weights_sha256")!=manifest["files"]["weights.safetensors"]["sha256"]
+        or receipt.get("checkpoint_id")!=origin["checkpoint_id"]
+        or receipt.get("training_dataset")!=origin["training_dataset"]
+        or not all(valid_id(receipt.get(k)) for k in ("benchmark_id","student_report","baseline_report"))):
+        raise ValueError("receipt/package binding mismatch")
+    quality=receipt.get("quality_review",{})
+    if (quality.get("schema")!="rpdistill-quality-review-v1"
+        or not valid_id(quality.get("review_id"))
+        or hash_json({k:v for k,v in quality.items() if k!="review_id"})!=quality["review_id"]
+        or quality.get("candidate_gate_passed") is not True or quality.get("failures")!=[]
+        or quality.get("release_ready") is not False or quality.get("review_gate")!=asdict(ReviewGate())
+        or any(quality.get(k)!=receipt[k] for k in ("benchmark_id","training_dataset","checkpoint_id","student_report","baseline_report"))):
+        raise ValueError("invalid nested quality evidence")
+    rights=receipt.get("rights_review",{})
+    replay=receipt.get("output_replay",{})
+    parity=receipt.get("rust_diagnostics",{})
+    if (rights.get("dataset")!=origin["training_dataset"]
+        or rights.get("model_license")!=manifest["rights"]["operator_declared_model_license"]
+        or rights.get("operator_rights_asserted") is not True
+        or rights.get("legal_rights_verified_by_software") is not False
+        or rights.get("distribution_authorized") is not False
+        or replay.get("actual_output_replay") is not True
+        or replay.get("cases")!=quality.get("case_count")
+        or not valid_id(replay.get("hypotheses_sha256"))
+        or parity.get("schema")!="rpdistill-rust-parity-v1"
+        or not valid_id(parity.get("report_id"))
+        or hash_json({k:v for k,v in parity.items() if k!="report_id"})!=parity["report_id"]
+        or parity.get("diagnostic_passed") is not True
+        or parity.get("package_id")!=expected_package_id
+        or parity.get("weights_sha256")!=receipt["weights_sha256"]
+        or parity.get("d_reference")!=D_REFERENCE
+        or parity.get("production_loader_verified") is not False
+        or parity.get("release_ready") is not False):
+        raise ValueError("invalid nested rights, replay or Rust evidence")
+    return {"package_id":expected_package_id,"receipt_id":expected_receipt_id,
+            "handoff_integrity_verified":True,"current_rights_revalidated":False,
+            "production_loader_verified":False,"distribution_authorized":False,"release_ready":False}

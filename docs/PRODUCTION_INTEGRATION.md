@@ -14,3 +14,6 @@ RPDistill 独立 candidate v1 是固定 Marian F32 256 张量与五个固定资�
 - E8 压缩候选只是存储压缩并还原 FP32，不能冒称 D 原生低精度推理；独立量化 profile 需另行审计。
 
 当前只提交 RPDistill 代码，D 线变更需协调。E10 可独立进行实际诊断路径性能剖析，不能把生产集成待办标为完成。
+
+## 双 pin 交接检查与终态复核
+`student-check-handoff --root PACKAGE --receipt RECEIPT.json --expected-package-id HASH --expected-receipt-id HASH`；两个预期 ID 应由独立可信记录提供，不能从不可信候选自行取值充当授权。验证当前候选、receipt_id、权重/来源/评测绑定、默认质量审查、嵌套报告 hash、权利声明、重放结果、Rust 诊断身份；诊断报告不能冒充审批凭证。仅输出 handoff_integrity_verified=true、current_rights_revalidated=false、production_loader_verified=false、distribution_authorized=false、release_ready=false。生成新凭证前再核对候选与现有本地权利，完整训练状态核对 data_sha256。仍假定稳定本地文件与可信本地工具，不提供并发攻击防护、远端许可实时核验或数字签名。

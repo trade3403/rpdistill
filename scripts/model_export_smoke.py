@@ -17,7 +17,7 @@ from rpdistill.distill import DistillConfig,train_sequence,save_checkpoint
 from rpdistill.training_data import acquire_assets,ASSET_BYTES
 from rpdistill.model_export import export_candidate,verify_package,REQUIRED_BYTES,PAYLOAD
 from rpdistill.rust_parity import rust_parity
-from rpdistill.export_review import verify_source_weights
+from rpdistill.export_review import verify_source_weights,check_integration_receipt
 
 torch.set_num_threads(2)
 exe=Path(sys.argv[1]).resolve()
@@ -88,6 +88,14 @@ with tempfile.TemporaryDirectory() as tmp:
         assert rejected_pin.returncode!=0 and not rejected_pin.stdout
     print(json.dumps({"actual_rust_inference":True,"wrong_weight_and_checkpoint_pin_rejected":True,
         "parity":parity}))
+    try:
+        check_integration_receipt(root/"candidate",parity,expected_package_id=m["package_id"],
+                                  expected_receipt_id=parity["report_id"])
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("diagnostic report accepted as integration receipt")
+    print(json.dumps({"diagnostic_report_cannot_authorize_handoff":True,"release_ready":False}))
     # Current official package loader MUST reject the distinct package.
     rejected=subprocess.run([str(official),str(root/"candidate")],capture_output=True)
     assert rejected.returncode!=0,"official package loader accepted independent candidate"

@@ -32,7 +32,7 @@ from .compression import plan as compression_plan, create_candidate
 from .compression_review import RegressionGate, compare_candidates
 from .model_export import export_plan, export_candidate, verify_package
 from .rust_parity import rust_parity
-from .export_review import review_integration
+from .export_review import review_integration, check_integration_receipt
 
 
 def runtime_info() -> dict[str, str]:
@@ -354,6 +354,9 @@ def parser() -> argparse.ArgumentParser:
     integration.add_argument("--max-cases",type=int,default=1000)
     integration.add_argument("--max-seconds",type=float,default=3600)
     integration.add_argument("--parity-timeout",type=int,default=180)
+    handoff=commands.add_parser("student-check-handoff",help="Verify existing local receipt integrity, not current rights or deployment")
+    for flag in ("root","receipt","expected-package-id","expected-receipt-id"):
+        handoff.add_argument("--"+flag,required=True)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -367,6 +370,9 @@ def main(argv=None) -> int:
             result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
             path=write_new(args.output,result)
             result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "student-check-handoff":
+            result=check_integration_receipt(args.root,read_json(args.receipt),
+                expected_package_id=args.expected_package_id,expected_receipt_id=args.expected_receipt_id)
         elif args.command == "student-review-integration":
             if Path(args.output).exists() or Path(args.output).is_symlink():
                 raise ValueError("output must be a new file")

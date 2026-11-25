@@ -3,12 +3,13 @@ import json
 from contextlib import closing
 from pathlib import Path
 import tempfile
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
 import torch
 
 from rpdistill.datasets import DatasetStore,encoded,sha
 from rpdistill.evaluation import freeze_benchmark,QualityGate,evaluate
 from rpdistill.quality_review import leakage_audit,create_blind_review,collect_review,ReviewGate
+from rpdistill.export_review import review_integration,check_replay
 from rpdistill.student import StudentProfile,StudentCodec,build_student,canonical_state
 from rpdistill.compression import create_candidate,load_candidate,plan,pack_tensor,unpack_tensor
 from rpdistill.compression_review import compare_candidates,verify_derivation
@@ -71,6 +72,28 @@ with tempfile.TemporaryDirectory() as tmp:
         "synthetic_reviewer_count":2,"insufficient_automatic_coverage_rejected":True,
         "process_peak_rss_bytes":reports[0]["performance"]["process_peak_rss_bytes"],
         "real_human_review":False}))
+    # Actual review/evaluation coverage must reject this synthetic tiny fixture.
+    report=reports[0]
+    package_fixture={"origin":{"checkpoint_id":report["checkpoint_id"],"training_dataset":version}}
+    with patch("rpdistill.export_review.verify_package",return_value=package_fixture),patch(
+        "rpdistill.export_review.verify_source_weights") as source_check,patch("rpdistill.export_review.rust_parity") as rust:
+        try:
+            review_integration(root/"db",root/"unused",root/"weights",benchmark,report,baseline,packet,key,reviews,
+                expected_package_id="a"*64,reviewed_dataset=version,reviewed_teacher_license="fixture",
+                reviewed_model_license="internal",rights_note="synthetic",reviewer="fixture",
+                executable="unused",acknowledge_local_candidate_only=True)
+        except ValueError as exc:
+            assert "quality review gate rejected" in str(exc) and "case_coverage" in str(exc)
+        else:
+            raise AssertionError("undersized evaluation was approved")
+        source_check.assert_not_called()
+        rust.assert_not_called()
+    import time
+    replay_model,_=load_evaluation_model(root/"weights",expected_dataset=version,profile=p)
+    replay=check_replay(replay_model,codec,benchmark,report,deadline=time.monotonic()+30)
+    assert replay["actual_output_replay"] and replay["cases"]==1
+    print(json.dumps({"actual_quality_coverage_rejected":True,"actual_generation_replay":True,
+        "real_human_review":False,"release_ready":False}))
     # Real conversion, strict reconstruction and greedy translation regression.
     compression=[]
     source,source_manifest=load_evaluation_model(root/"weights",expected_dataset=version,profile=p)
