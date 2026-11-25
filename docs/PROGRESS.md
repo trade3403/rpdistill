@@ -1,7 +1,7 @@
 # RPDistill 研发进度与验收台账
 
 更新时间：2026-11-25（更新）
-仓库：trade3403/rpdistill；分支：main；版本：V0.1.0；当前阶段：E1.1 CPU CI 已通过，E1.2 基础代码已提交，待 CI 验收。
+仓库：trade3403/rpdistill；分支：main；版本：V0.1.0；当前阶段：E1.1 CPU CI 已通过，E1.2 CPU CI 六环境已通过；E2.1 已提交待 CI。
 
 ## 当前阶段
 
@@ -27,8 +27,9 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | 阶段 | 工作 | 状态 |
 |---|---|---|
 | E1.1 | 基础工程、CLI、配置、CPU CI | CPU CI 已通过 |
-| E1.2 | 实验任务、日志、设备探测 | 基础实现已提交，待 CI；真实 worker 控制待后续 |
-| E2 | 教师模型管理与选型 | 待开发 |
+| E1.2 | 实验任务、日志、设备探测 | CPU CI 六环境通过；真实 worker 控制待后续 |
+| E2.1 | 教师在线检索、下载校验与注册 | 已提交，待 CI |
+| E2.2/E2.3 | 下载任务与 ModelScope、教师加载翻译 | 待开发 |
 | E3 | 科研语料生成清洗 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -49,7 +50,7 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 
 ## 下一步
 
-核验 E1.2 CPU CI；通过后推进 E2 教师模型适配和 E3 论文采集。
+核验 E2.1 CPU CI；通过后推进 E2.2 下载管理与 ModelScope，随后 E2.3 教师翻译适配和 E3 论文采集。
 
 ## 强制维护约定
 
@@ -75,3 +76,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E1.2 CI 修复记录
 [首次运行 45581459305](https://github.com/trade3403/rpdistill/actions/runs/45581459305) 六个环境全部失败。已检查 macOS/Linux 日志：TaskStore.list 方法遮蔽内置 list，后续 events 返回类型注解在类定义时触发 TypeError，导致两个测试模块无法导入。四个设备测试在已查看日志中通过。修复：tasks.py 使用延迟注解求值（from __future__ import annotations），不改变任务接口或删除测试。重新运行原六环境 CI，全部通过后才能推进 E2；本次修复尚未验收。
+
+## E1.2 修复验收与 E2.1 开发
+修复提交 ae2da3dca1d1a5f7c2f826068831ba43a87d0b29 对应 [CI 45581701119](https://github.com/trade3403/rpdistill/actions/runs/45581701119) 已确认六个 job 全部 success。E2.1 新增 teachers.py、可选 Hub SDK、CLI model-search/model-download/model-list、固定 revision、许可证确认、预算/磁盘预检、安全文件清单、大小及上游可用 SHA-256 校验、本地哈希记录与 SQLite 自动注册。新增 8 个测试方法，总计 23 个，全部使用模拟 Hub 客户端/合成文件，不是实际模型权重。当前 E2.1 新提交待 CI；尚无真实在线下载/加载、应用级进度与暂停、ModelScope 或 GPU 训练结果。免费 Runner 不下载大模型；实际联网和大模型验收留给用户电脑。

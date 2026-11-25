@@ -2,12 +2,12 @@
 
 仓库：trade3403/rpdistill；主分支 main。原科研 PDF 仓库 A/B/C/D 分支不得修改。
 
-当前 E1.2：SQLite 实验记录、状态转换、事件日志、设备探测、CLI 与 CPU CI；新代码待 CI 验收。尚未完成真实训练、教师选型、GUI 或模型导出。CI 结果以 GitHub Actions 最新对应提交为准。
+当前 E2.1：E1.2 CPU CI 六环境已通过，新增 Hugging Face 教师搜索/下载/校验/注册，待 CI。尚未完成真实训练、教师选型、GUI 或模型导出。CI 结果以 GitHub Actions 最新对应提交为准。
 
 接手步骤：
 1. 查阅本文件、ROADMAP、ARCHITECTURE。
 2. 核实最新 main 提交与 CI；修复失败，不虚报测试通过。
-3. E1.2 CI 通过后推进 E2 教师模型适配与下载。
+3. E2.1 CI 通过后推进 E2.2 下载管理、ModelScope，E2.3 教师翻译适配，再进入 E3。
 4. 阶段完成后更新交接与测试记录，提交到本仓库。
 5. 进入 E4 前核实 RPTranslate 当前真实模型结构和格式；不假定兼容性。
 
@@ -32,3 +32,5 @@ E11 界面须参考 `docs/assets/rpdistill-auto-distill-dashboard.png` 与同目
 GitHub 标准免费 CPU runner 用于轻量跨平台 CI；真实 GPU、大模型、长时间蒸馏测试使用用户自己的电脑。先提供可复现本地命令及真实验收报告模板。不在托管 runner 下载大模型或声称模拟 GPU 测试等于实际训练。
 
 E1.2 首次 CI 六环境失败，已修复 TaskStore 类型注解名称遮蔽问题；详见 PROGRESS.md。重新验证修复提交全部通过后才进入 E2。
+
+E1.2 修复 CI 45581701119 已成功（6/6）。E2.1 可选 Hub 依赖安装方式见 README。CLI model-download 需要实际完整 commit SHA、已审核许可证标识与下载字节预算，仅公开 SafeTensors；合成测试通过不代表真实模型已验证。下一阶段补下载队列/进度/恢复与真实小模型验收，按用户要求大模型在用户电脑运行。

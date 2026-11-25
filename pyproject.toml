@@ -9,6 +9,9 @@ description = "Independent model distillation and training studio"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+hub = ["huggingface_hub>=0.31,<2"]
+
 [project.scripts]
 rpdistill = "rpdistill.__main__:main"
 
