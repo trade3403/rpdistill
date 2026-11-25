@@ -90,3 +90,26 @@ class FulltextTests(unittest.TestCase):
         self.download(self.fetch([xml(),xml()]))
         self.lib.path_for("PMC123").write_bytes(b"corrupt")
         self.assertEqual(self.download(self.fetch([xml(),xml()]))["saved"],1)
+
+    def test_repeated_publisher_ids_not_identity_conflict(self):
+        raw = xml().replace(b'<permissions>', b'<article-id pub-id-type="publisher-id" assigning-authority="a">1</article-id><article-id pub-id-type="publisher-id" assigning-authority="b">2</article-id><permissions>')
+        self.assertEqual(inspect_record(raw,"PMC123",full=True)["license"],"cc-by")
+
+    def test_duplicate_normalized_doi_and_pmc(self):
+        raw = xml().replace(b'<permissions>', b'<article-id pub-id-type="pmcid">PMC123</article-id><article-id pub-id-type="doi">https://doi.org/10.1234/TEST</article-id><permissions>')
+        self.assertEqual(inspect_record(raw,"PMC123",full=True)["doi"],"10.1234/test")
+        with self.assertRaises(Blocked):
+            inspect_record(raw.replace(b'10.1234/TEST',b'10.1234/other'),"PMC123",full=True)
+
+    def test_nested_license_uri(self):
+        raw = xml().replace(b' xlink:href="https://creativecommons.org/licenses/by/4.0/"',b'').replace(b'Open license',b'<ext-link ext-link-type="uri" xlink:href="http://creativecommons.org/licenses/by/4.0">CC BY</ext-link>')
+        self.assertEqual(inspect_record(raw,"PMC123",full=True)["license_uri"],
+                         "https://creativecommons.org/licenses/by/4.0/")
+
+    def test_nested_conflicting_or_restricted_license(self):
+        raw = xml().replace(b'Open license',b'<ext-link xlink:href="https://creativecommons.org/licenses/by-nc/4.0/">Restricted</ext-link>')
+        with self.assertRaises(Blocked):
+            inspect_record(raw,"PMC123",full=True)
+        raw = xml().replace(b' xlink:href="https://creativecommons.org/licenses/by/4.0/"',b'')
+        with self.assertRaises(Blocked):
+            inspect_record(raw,"PMC123",full=True)

@@ -117,3 +117,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 用户明确要求跳过 Europe PMC 论文检索先做其他功能。最新文档 CI 45592551774 8/8 success；联网 run 45589377415 attempt 3：NCBI PMC success、Europe PMC failure，保留真实失败记录，不认定为通过。Europe PMC job 改为手动 workflow_dispatch，常规推进要求其余标准 CI 及 NCBI 联网全部通过。NCBI PMC 成为默认 CLI 来源。E3.2 新增 fulltext.py、官方 OAI-PMH pmc_fm 预检与 pmc 全文下载、明确 CC BY/CC0 URI、标识/记录日期/许可一致性检查、预算、原子文件保存、哈希与 SQLite 状态、缓存复用。新增 8 测试方法累计 81，新增真实小规模全文 smoke（8 MiB，最多 3 候选），待 CI。原始全文不是训练授权，第三方材料和内容过滤留 E3.3，PDF 下载及多来源后续。未运行真实 GPU 或下载大型模型。下一步核验 E3.2 CI，再进入解析分段及双语语料生成。
 
 并发修复合并说明：保留 6c37e2d90623806b62baafb3a9cac59e8dd50b01 的 Europe PMC 排序字段修复及测试；其标准 CI 45596188128、双来源联网 45596188201 已通过。此前失败为历史记录，最新 Europe PMC 已实测恢复。按用户要求仍暂缓其常规联网门槛，NCBI PMC 为默认来源，Europe PMC 可手动复验。E3.2 新提交待验收。
+
+## E3.2 首次真实全文验收与修复
+提交 64353e110e4f44259c647b4aef2c2db12806b355 对应 [标准 CI 45596496110](https://github.com/trade3403/rpdistill/actions/runs/45596496110) 8/8 通过；[联网 45596496006](https://github.com/trade3403/rpdistill/actions/runs/45596496006) NCBI 检索成功，Europe PMC 按授权 skipped，全文 job 139143823890 失败：实际检索 5 条、预检 3 条，0 保存，3 阻断（1 条许可 URI 不在白名单、2 条重复标识冲突），累计响应 36773 字节。修复 JATS 仅对 PMCID/DOI 做身份一致性检查，允许无关出版商 ID 重复；规范化相同 DOI/PMCID，支持许可节点内明确 CC BY/CC0 链接（不接受缺失、混合、限制许可）。新增 4 个单元测试；真实 smoke 候选检查上限 10，维持 8 MiB 总预算及至少一篇成功的断言。真实 XML 原文未能通过当前浏览工具读取，具体字段修复基于日志及 JATS 结构，待实际 CI 验证。未进入 E3.3。

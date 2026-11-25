@@ -10,7 +10,7 @@ import sqlite3
 import tempfile
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request
 import xml.etree.ElementTree as ET
 
@@ -98,6 +98,40 @@ def fetch_record(pmcid, prefix, budget, *, opener=open_https, sleep=time.sleep):
             sleep(retry_delay(exc, attempt))
 
 
+def canonical_license(uri):
+    """Normalize only explicit, versioned, allowlisted Creative Commons URIs."""
+    if not isinstance(uri, str):
+        return None
+    uri = uri.strip()
+    if not re.fullmatch(
+            r"https?://creativecommons\.org/(?:licenses/by/(?:2\.0|2\.5|3\.0|4\.0)|publicdomain/zero/1\.0)/?",
+            uri, re.I):
+        return None
+    return "https://creativecommons.org" + urlsplit(uri).path.lower().rstrip("/") + "/"
+
+
+def article_license(lic):
+    # JATS may use xlink:href on license, license-p, ext-link, or ali:license_ref.
+    # Only explicit license-scoped links count, never a free-text keyword match.
+    candidates = []
+    for node in lic.iter():
+        if node is lic or tag(node) in ("license-p", "ext-link", "uri", "license_ref"):
+            for attr in (XLINK, "href"):
+                value = node.get(attr)
+                if value and (node is lic or "creativecommons.org" in value.lower()):
+                    candidates.append(value)
+            if tag(node) in ("license_ref", "uri", "ext-link"):
+                value = (node.text or "").strip()
+                if value.lower().startswith(("https://creativecommons.org/", "http://creativecommons.org/")):
+                    candidates.append(value)
+    if not candidates:
+        raise Blocked("explicit article license URI missing")
+    normalized = {canonical_license(value) for value in candidates}
+    if None in normalized or len(normalized) != 1:
+        raise Blocked("article license URI not allowlisted or conflicting")
+    return normalized.pop()
+
+
 def inspect_record(raw, pmcid, *, full=False, expected_doi=None):
     """Require matching OAI identity and an explicit article-level CC BY/CC0 URI."""
     pmcid_value(pmcid)
@@ -118,28 +152,29 @@ def inspect_record(raw, pmcid, *, full=False, expected_doi=None):
         raise Blocked("OAI identity mismatch or deleted record")
     article = one(one(record, "metadata"), "article")
     meta = one(one(article, "front"), "article-meta")
-    ids = {}
+    # Publisher/manuscript IDs may repeat with different assigning authorities.
+    # Only the identity fields relevant to this acquisition are compared.
+    pmc_values, doi_values = set(), set()
     for node in children(meta, "article-id"):
-        kind = node.get("pub-id-type")
+        kind = (node.get("pub-id-type") or "").lower()
         value = (node.text or "").strip()
-        if kind in ids and ids[kind] != value:
-            raise Blocked("conflicting article identifiers")
-        ids[kind] = value
-    values = [ids[k] for k in ("pmc", "pmcid") if k in ids]
-    if not values or any(v not in (pmcid, pmcid[3:]) for v in values):
+        if kind in ("pmc", "pmcid"):
+            pmc_values.add("PMC" + value.removeprefix("PMC"))
+        elif kind == "doi":
+            doi_values.add(normalize_doi(value))
+    if pmc_values != {pmcid}:
         raise Blocked("article PMCID mismatch")
-    if expected_doi and normalize_doi(ids.get("doi")) != expected_doi:
+    if None in doi_values or len(doi_values) > 1:
+        raise Blocked("conflicting article DOI")
+    doi = next(iter(doi_values), None)
+    if expected_doi and doi != expected_doi:
         raise Blocked("article DOI mismatch")
     permissions = one(meta, "permissions")
     licenses = children(permissions, "license")
     if len(licenses) != 1:
         raise Blocked("ambiguous article license")
     lic = licenses[0]
-    href = lic.get(XLINK) or lic.get("href")
-    if not isinstance(href, str) or not re.fullmatch(
-            r"https?://creativecommons\.org/(?:licenses/by/(?:2\.0|2\.5|3\.0|4\.0)|publicdomain/zero/1\.0)/?",
-            href, re.I):
-        raise Blocked("article license URI not allowlisted")
+    href = article_license(lic)
     code = license_code(href)
     if code is None:
         raise Blocked("unsupported license")
@@ -151,7 +186,7 @@ def inspect_record(raw, pmcid, *, full=False, expected_doi=None):
         raise Blocked("full-text body missing")
     return {"license_uri":href, "license":code,
             "license_text":" ".join(lic.itertext()).strip(),
-            "doi":normalize_doi(ids.get("doi")),
+            "doi":doi,
             "datestamp":one(header,"datestamp").text}
 
 
