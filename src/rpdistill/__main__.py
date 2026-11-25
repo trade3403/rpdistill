@@ -27,6 +27,7 @@ from .resumable import ResumeConfig, train_reviewed_segment
 from .training_queue import TrainingQueue
 from .evaluation import freeze_benchmark, evaluate, read_json, read_jsonl, write_new, QualityGate
 from .student_evaluation import GenerationConfig, evaluate_checkpoint
+from .quality_review import leakage_audit, create_blind_review, collect_review, ReviewGate
 
 
 def runtime_info() -> dict[str, str]:
@@ -36,7 +37,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E7b1",
+        "stage": "E7b2",
     }
 
 
@@ -281,6 +282,24 @@ def parser() -> argparse.ArgumentParser:
     student_ev.add_argument("--max-new-tokens",type=int,default=128)
     student_ev.add_argument("--max-logits",type=int,default=16777216)
     student_ev.add_argument("--output",required=True)
+    audit=commands.add_parser("benchmark-leakage-audit")
+    audit.add_argument("--benchmark",required=True)
+    audit.add_argument("--output",required=True)
+    blind=commands.add_parser("benchmark-blind")
+    blind.add_argument("--benchmark",required=True)
+    blind.add_argument("--student-report",required=True)
+    blind.add_argument("--baseline-report",required=True)
+    blind.add_argument("--packet",required=True)
+    blind.add_argument("--key",required=True,help="Private mapping, keep away from reviewers")
+    review=commands.add_parser("benchmark-review")
+    review.add_argument("--benchmark",required=True)
+    review.add_argument("--student-report",required=True)
+    review.add_argument("--baseline-report",required=True)
+    review.add_argument("--packet",required=True)
+    review.add_argument("--key",required=True)
+    review.add_argument("--reviews",required=True,help="JSON list of independent reviewer records")
+    review.add_argument("--gate",help="Optional JSON ReviewGate; engineering thresholds, not release approval")
+    review.add_argument("--output",required=True)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -294,6 +313,26 @@ def main(argv=None) -> int:
             result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
             path=write_new(args.output,result)
             result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "benchmark-leakage-audit":
+            result=leakage_audit(args.db,read_json(args.benchmark))
+            path=write_new(args.output,result)
+            result={k:v for k,v in result.items() if k!="matches"}|{"path":path,"match_count":len(result["matches"])}
+        elif args.command == "benchmark-blind":
+            if Path(args.packet).resolve()==Path(args.key).resolve() or any(
+                    Path(p).exists() or Path(p).is_symlink() for p in (args.packet,args.key)):
+                raise ValueError("packet and private key require two distinct new files")
+            packet,key=create_blind_review(args.db,read_json(args.benchmark),
+                read_json(args.student_report),read_json(args.baseline_report))
+            private_path=write_new(args.key,key)
+            packet_path=write_new(args.packet,packet)
+            result={"packet_id":packet["packet_id"],"cases":len(packet["cases"]),
+                    "packet_path":packet_path,"private_key_path":private_path}
+        elif args.command == "benchmark-review":
+            result=collect_review(args.db,read_json(args.benchmark),read_json(args.student_report),
+                read_json(args.baseline_report),read_json(args.packet),read_json(args.key),
+                read_json(args.reviews),gate=ReviewGate(**read_json(args.gate)) if args.gate else ReviewGate())
+            path=write_new(args.output,result)
+            result={k:v for k,v in result.items() if k!="lexical_audit"}|{"path":path}
         elif args.command == "benchmark-student":
             if Path(args.output).exists() or Path(args.output).is_symlink():
                 raise ValueError("output must be a new file")

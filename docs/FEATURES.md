@@ -69,3 +69,5 @@ E6b1 10/10 必需 CI success，GPU 本机验收待做。E6b2 持久训练队列/
 E6b2 标准 CI 9/9 success（真实 CPU 队列、3 checkpoints、176 states 一致）。E7a 独立参考评测集、BLEU/chrF、数字/术语/引用/公式字面检查与自动评分 gate 已提交待 CI；真实模型评测与人工质量认证后续。
 
 E7a 13/13 CI success；E7b1 真实学生检查点评测、CPU greedy、双检查点格式、同 benchmark baseline delta 与延迟/吞吐记录已提交待 CI。正式人工评测、近重复/真实基线及内存实测待 E7b2；未宣称真实科研翻译质量或可发布。
+
+E7b1 标准 CI 10/10 success；E7b2 有界近重复审计、匿名 A/B 盲测流程、完整双评审候选门槛和 Linux/macOS peak RSS 已提交待 CI；真实人工评审、基线来源认证、语义独立性、COMET 与真实 GPU/质量仍待实际验收。

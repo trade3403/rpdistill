@@ -8,6 +8,7 @@ import json
 import math
 from pathlib import Path
 import time
+import sys
 
 from .distill import load_checkpoint
 from .evaluation import evaluate,validate_benchmark,QualityGate,hash_json
@@ -129,6 +130,15 @@ def generate_one(model,codec,source,config=GenerationConfig()):
             "latency_seconds":time.perf_counter()-start}
 
 
+def peak_process_rss():
+    """Process lifetime high-water RSS on Linux/macOS, not model-only or GPU memory."""
+    if sys.platform not in ("linux","darwin"):
+        return None
+    import resource
+    value=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return int(value*(1024 if sys.platform=="linux" else 1))
+
+
 def evaluate_checkpoint(db_path,benchmark,checkpoint,assets,*,config=GenerationConfig(),
                         gate=QualityGate(),baseline=None,profile=FIXED,codec=None):
     import torch
@@ -169,7 +179,8 @@ def evaluate_checkpoint(db_path,benchmark,checkpoint,assets,*,config=GenerationC
             "p95_case_seconds":times[math.ceil(len(times)*0.95)-1],
             "generated_tokens_per_second":sum(r["generated_tokens"] for r in generation)/elapsed if elapsed else None,
             "canonical_weight_bytes":contract(profile)["fp32_payload_bytes"],
-            "measurement_scope":"single-case greedy no KV cache; weights only, not process memory"})
+            "process_peak_rss_bytes":peak_process_rss(),
+            "measurement_scope":"single-case greedy no KV cache; RSS is process-lifetime high water, not isolated model memory; unavailable on unsupported OS"})
     if baseline is not None:
         comparison=evaluate(db_path,benchmark,baseline,gate=gate,label="external baseline")
         report["baseline"]={"report_id":comparison["report_id"],"hypotheses_sha256":comparison["hypotheses_sha256"],

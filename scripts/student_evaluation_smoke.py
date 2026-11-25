@@ -7,7 +7,8 @@ from unittest.mock import Mock
 import torch
 
 from rpdistill.datasets import DatasetStore,encoded,sha
-from rpdistill.evaluation import freeze_benchmark,QualityGate
+from rpdistill.evaluation import freeze_benchmark,QualityGate,evaluate
+from rpdistill.quality_review import leakage_audit,create_blind_review,collect_review,ReviewGate
 from rpdistill.student import StudentProfile,StudentCodec,build_student
 from rpdistill.distill import DistillConfig,train_sequence,save_checkpoint
 from rpdistill.resumable import ResumeConfig,run_segment
@@ -52,6 +53,22 @@ with tempfile.TemporaryDirectory() as tmp:
         assert report["metrics"]["chrf"]>99 and "baseline" in report
         assert not report["automatic_gate_passed"] # insufficient coverage
         reports.append(report)
+    assert reports[0]["performance"]["process_peak_rss_bytes"]>0
+    baseline=evaluate(root/"db",benchmark,[{"id":"a","hypothesis":"科研翻译。"}],label="synthetic baseline")
+    audit=leakage_audit(root/"db",benchmark)
+    assert audit["passed"]
+    packet,key=create_blind_review(root/"db",benchmark,reports[0],baseline)
+    scores=[{"id":r["id"],"A":{"adequacy":4,"fluency":4,"critical_error":False},
+             "B":{"adequacy":4,"fluency":4,"critical_error":False},"preference":"tie"} for r in packet["cases"]]
+    reviews=[{"reviewer":name,"packet_id":packet["packet_id"],"independent_review_asserted":True,
+              "scores":scores} for name in ("synthetic-reviewer-1","synthetic-reviewer-2")]
+    reviewed=collect_review(root/"db",benchmark,reports[0],baseline,packet,key,reviews,gate=ReviewGate(min_cases=1))
+    assert reviewed["reviewer_count"]==2 and not reviewed["candidate_gate_passed"]
+    assert "automatic_quality" in reviewed["failures"] and not reviewed["release_ready"]
+    print(json.dumps({"lexical_audit_pass":True,"blind_review_roundtrip":True,
+        "synthetic_reviewer_count":2,"insufficient_automatic_coverage_rejected":True,
+        "process_peak_rss_bytes":reports[0]["performance"]["process_peak_rss_bytes"],
+        "real_human_review":False}))
     try:
         load_evaluation_model(root/"full",profile=p,expected_dataset="0"*64)
     except ValueError:

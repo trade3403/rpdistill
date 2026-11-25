@@ -62,3 +62,5 @@ E6b2 TrainingQueue：已审核 dataset version → SQLite 训练 spec/事件、�
 E7a evaluation.py：训练快照全量哈希→规范化精确源文与声明 DOI/PMCID 排除→独立参考 benchmark hash→外部 hypothesis ID 对齐→SacreBLEU zh BLEU/chrF 与科学字面/启发式指标→覆盖/指标门槛与哈希报告。人工参考权利为操作者声明，外部输出未认证，自动门槛不授权发布，真实学生推理及基线/人工评测后续。
 
 E7b1 student_evaluation.py：冻结 benchmark → 绑定训练 dataset 的已完成 checkpoint（E5 weights/E6 full-state，哈希/shape 严格验证，仅模型权重）→ CPU FP32 greedy generation（源文本，不输入 reference）→ 网络词表解码/完成状态 → SacreBLEU 与科研规则 → 可选外部基线同 benchmark delta、实际延迟与吞吐、报告 SHA；无 KV cache，权重字节非 RSS，未签名外部输出，release_ready=false。真实独立质量/性能待 E7b2/本机。
+
+E7b2 quality_review.py：冻结 benchmark + 训练快照 → 有界 trigram 倒排审计；两个同 benchmark 报告的内容 hash 与指标重算 → 随机匿名 A/B packet、独立私有映射 → 声明独立评审完整双侧评分 → 默认自动质量/生成状态/词面泄漏与人工候选 gate。身份和来源未认证，release_ready=false；Linux/macOS RSS 为进程生命周期峰值，非模型独占内存。COMET 及真实正式质量仍待本机。
