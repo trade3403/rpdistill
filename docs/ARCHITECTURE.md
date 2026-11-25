@@ -42,3 +42,5 @@ E1.1 仅实现标准库基础配置和 CLI；以上其余模块为计划。
 E3.1 增加 NCBI PMC E-utilities 备用来源：ESearch（OA 与 CC BY/CC0 搜索过滤）→ ESummary → PaperCatalog，保留来源及查询筛选证据，不伪造具体许可；只在 Europe PMC 首次请求瞬态失败时自动切换，部分成功后失败不重新消耗预算。官方文档 https://pmc.ncbi.nlm.nih.gov/about/userguide/ 。后续全文优先当前 PMC OAI-PMH/Cloud 官方接口，旧 OA Web Service 已退役，参见 https://pmc.ncbi.nlm.nih.gov/tools/developers/ 与 https://pmc.ncbi.nlm.nih.gov/about/new-in-pmc/ 。
 
 E3.2：NCBI PMC 默认，Europe PMC 暂缓。FulltextLibrary 消费 PaperCatalog 候选，经官方 OAI-PMH pmc_fm→pmc 验证身份及许可 URI，一致才原子保存原始 XML 并记录哈希、来源、许可、状态。SQLite 单篇写事务串行，累计响应字节及单篇大小限制，缓存基于哈希。原始 XML 状态 downloaded_pending_content_review，E3.3 需排除第三方限制材料，保持署名和许可，不自动训练。官方：https://pmc.ncbi.nlm.nih.gov/tools/oai/ 。
+
+E3.3a CorpusStore：输入已登记 PMC XML 和 PaperCatalog，检查当前资格、哈希、许可、日期；仅提取保守正文/摘要文本段，排除复杂结构和明确限制标记。每段存来源、署名、许可、论文级固定划分及哈希；教师版本/选项/提示与质量策略共同生成候选译文幂等键。数字和长度等基础筛查仅为候选筛选，候选 JSONL 不作为训练认证。后续 E3.3b 增加更完整的权利、语义、语言和数据集版本/冻结/自动调度能力。

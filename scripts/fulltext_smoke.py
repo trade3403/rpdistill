@@ -5,6 +5,7 @@ import tempfile
 from rpdistill.papers import PaperCatalog, PaperQuery
 from rpdistill.ncbi_papers import discover_with_source
 from rpdistill.fulltext import FulltextLibrary
+from rpdistill.corpus import CorpusStore
 
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
@@ -19,3 +20,7 @@ with tempfile.TemporaryDirectory() as tmp:
                                   for r in lib.list()]}))
     assert result["saved"] > 0
     assert all(r["status"] != "training_ready" for r in lib.list())
+
+    parsed = CorpusStore(root/'db').parse(root/'xml',limit=10)
+    print(json.dumps({'corpus_parse':parsed,'candidate_only':True}))
+    assert parsed['segments'] > 0

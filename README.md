@@ -95,3 +95,6 @@ Europe PMC 日期检索按 FIRST_PDATE 筛选，使用官方 P_PDATE_D desc 排�
 并发修复合并说明：保留 6c37e2d90623806b62baafb3a9cac59e8dd50b01 的 Europe PMC 排序字段修复及测试；其标准 CI 45596188128、双来源联网 45596188201 已通过。此前失败为历史记录，最新 Europe PMC 已实测恢复。按用户要求仍暂缓其常规联网门槛，NCBI PMC 为默认来源，Europe PMC 可手动复验。E3.2 新提交待验收。
 
 E3.2 首次真实全文 smoke 发现 JATS 多种标识和许可表达兼容问题，已修复并保持明确 CC BY/CC0 URI 和身份一致性检查，等待重新验收。
+
+### E3.3a 论文解析和候选双语语料
+E3.2 修复版标准 CI 8/8、NCBI 联网 2/2 通过，真实下载 10 篇 CC BY 全文，接收 1,436,306 字节。Europe PMC 授权暂缓。E3.3a 新增 `paper-download` 后的 `corpus-parse`、`corpus-list`、`corpus-translate MODEL_ID --revision FULL_SHA`、`corpus-export --output candidates.jsonl`。提取正文/摘要中保守允许的英文拉丁字符比例较高的纯文本段落，保留署名及许可、源文件哈希、论文级固定划分；排除复杂公式、图表、引用块、明确第三方权利标记及超长不可安全切分句子，不截断。教师译文经完成状态、数字、长度、原文复写检查后仅生成候选 JSONL（training_ready=false）；不保证语义正确、语言或版权完全核实。真实教师与训练数据集门槛在后续 E3.3b/E7，需加入语言识别、术语/公式和语义检查、可恢复调度及版本化数据集。CLI 目前分阶段调用，不是一键自动蒸馏。新增真实联网 XML 解析断言，待 CI。

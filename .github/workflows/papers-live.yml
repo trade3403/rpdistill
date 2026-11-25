@@ -8,6 +8,7 @@ on:
       - 'src/rpdistill/ncbi_papers.py'
       - 'scripts/ncbi_papers_smoke.py'
       - 'src/rpdistill/fulltext.py'
+      - 'src/rpdistill/corpus.py'
       - 'scripts/fulltext_smoke.py'
       - '.github/workflows/papers-live.yml'
   workflow_dispatch:

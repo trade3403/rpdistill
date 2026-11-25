@@ -17,6 +17,7 @@ from .inference import TranslationOptions, load_teacher
 from .papers import PaperQuery, PaperCatalog
 from .ncbi_papers import discover_with_source
 from .fulltext import FulltextLibrary
+from .corpus import CorpusStore
 
 
 def runtime_info() -> dict[str, str]:
@@ -26,7 +27,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E3.2",
+        "stage": "E3.3a",
     }
 
 
@@ -107,6 +108,25 @@ def parser() -> argparse.ArgumentParser:
     download.add_argument("--limit", type=int, default=20)
     texts = commands.add_parser("paper-fulltexts")
     texts.add_argument("--root", default=str(Path.home()/".rpdistill"/"papers"))
+    parse = commands.add_parser("corpus-parse")
+    parse.add_argument("--root", default=str(Path.home()/".rpdistill"/"papers"))
+    parse.add_argument("--limit", type=int, default=20)
+    parse.add_argument("--max-chars", type=int, default=1200)
+    segments = commands.add_parser("corpus-list")
+    segments.add_argument("--limit", type=int, default=100)
+    gen = commands.add_parser("corpus-translate")
+    gen.add_argument("model_id")
+    gen.add_argument("--revision", required=True)
+    gen.add_argument("--source", choices=["huggingface","modelscope"], default="huggingface")
+    gen.add_argument("--device", default="cpu")
+    gen.add_argument("--dtype", default="float32")
+    gen.add_argument("--batch-size", type=int, default=1)
+    gen.add_argument("--max-input-tokens", type=int, default=2048)
+    gen.add_argument("--max-new-tokens", type=int, default=1024)
+    gen.add_argument("--limit", type=int, default=100)
+    export = commands.add_parser("corpus-export")
+    export.add_argument("--output", required=True)
+    export.add_argument("--limit", type=int, default=10000)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -128,6 +148,17 @@ def main(argv=None) -> int:
                 max_bytes=args.max_bytes, limit=args.limit)
         elif args.command == "paper-fulltexts":
             result = FulltextLibrary(args.db, args.root).list()
+        elif args.command == "corpus-parse":
+            result = CorpusStore(args.db).parse(args.root,limit=args.limit,max_chars=args.max_chars)
+        elif args.command == "corpus-list":
+            result = CorpusStore(args.db).list_segments(args.limit)
+        elif args.command == "corpus-translate":
+            options = TranslationOptions(device=args.device,dtype=args.dtype,batch_size=args.batch_size,
+                max_input_tokens=args.max_input_tokens,max_new_tokens=args.max_new_tokens)
+            result = CorpusStore(args.db).translate(load_teacher(args.db,args.model_id,args.revision,
+                options,source=args.source),limit=args.limit)
+        elif args.command == "corpus-export":
+            result = CorpusStore(args.db).export_candidates(args.output,limit=args.limit)
         elif args.command == "paper-list":
             result = PaperCatalog(args.db).list(args.limit)
         elif args.command == "teacher-translate":
