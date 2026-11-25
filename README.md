@@ -21,3 +21,6 @@ python -m unittest discover -s tests -v
 ## 功能与进度
 - [完整功能清单（FEATURES.md）](docs/FEATURES.md)
 - [研发进度与 CI 验收台账（PROGRESS.md）](docs/PROGRESS.md)
+
+## 内置在线下载（规划中的必选功能）
+教师模型及合法公开训练数据集支持软件内搜索、一键下载、断点续传、完整性校验与自动入库；正常联网使用无需手动下载文件。E2/E3 实现核心，E11 集成 GUI；尚未实现。
