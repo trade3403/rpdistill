@@ -152,3 +152,6 @@ E9b2 交接校验：`student-check-handoff --root PACKAGE --receipt RECEIPT.json
 E9b2 a7582b5 标准 CI 10/10 + Rust 专项 1/1 success，真实生成重放及拒绝诊断报告冒充审批凭证通过。`student-rust-profile --root PACKAGE --expected-package-id HASH --executable TRUSTED_BRIDGE --timeout-seconds 300 --output PROFILE.json` 使用更新后可信 Rust bridge 的 `--profile` 模式，16/64 源 tokens、8/16 最大生成 tokens，每组预热1次、测量3次，普通与缓存解码交替顺序，逐次输出一致方可报告；计时六项加载阶段、Encoder、Decoder prepare、full/cache generation、median/实际 token/s/cache ratio、Linux Rust process peak RSS。保留原 `student-rust-parity` 协议。报告绑定包/权重/可执行文件哈希与机器基础信息；不控制 OS 文件缓存，非冷启动 SLA、实际翻译或生产性能；真实完整尺寸 CI 待验收，E10b 按实测选择优化点。详见 [性能基准说明](docs/PERFORMANCE.md)。
 
 E10a 首次完整尺寸 Rust 专项成功：缓存解码比普通解码 1.13/1.23 倍（合成短序列），RSS 323821568 bytes。标准 CI 六环境因提前 EOS 测试 fixture 前缀替换错误失败；已修正 fixture 并新增非法 EOS 后 token 拒绝回归，runtime 校验不变。待新标准及专项通过后进入 E10b。
+
+### E10b 词表投影性能实验
+E10a 修复后标准及专项 11/11 success。E10b 在临时固定 D checkout 中尝试最多四线程 FP32 词表行并行，保留每行累加顺序和共享权重，不修改原 D 仓库。`student-rust-compare-projection --root PACKAGE --expected-package-id HASH --baseline-executable TRUSTED_BASELINE --experiment-executable TRUSTED_EXPERIMENT --output REPORT.json`：相同包双构建完整诊断字节一致后，同机实测两组吞吐、延迟、RSS；不要求固定加速比。CI 新增真实对照与 D library 回归，尚未验收；实验不是生产部署或正式翻译质量。详见 [性能基准](docs/PERFORMANCE.md)。

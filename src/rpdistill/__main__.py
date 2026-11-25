@@ -33,6 +33,7 @@ from .compression_review import RegressionGate, compare_candidates
 from .model_export import export_plan, export_candidate, verify_package
 from .rust_parity import rust_parity
 from .rust_profile import rust_profile
+from .projection_experiment import compare_projection
 from .export_review import review_integration, check_integration_receipt
 
 
@@ -43,7 +44,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E10a",
+        "stage": "E10b",
     }
 
 
@@ -362,6 +363,10 @@ def parser() -> argparse.ArgumentParser:
     for flag in ("root","expected-package-id","executable","output"):
         profile.add_argument("--"+flag,required=True)
     profile.add_argument("--timeout-seconds",type=int,default=180)
+    experiment=commands.add_parser("student-rust-compare-projection",help="Compare two trusted local diagnostic builds")
+    for flag in ("root","expected-package-id","baseline-executable","experiment-executable","output"):
+        experiment.add_argument("--"+flag,required=True)
+    experiment.add_argument("--timeout-seconds",type=int,default=300)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -393,6 +398,14 @@ def main(argv=None) -> int:
                 parity_timeout=args.parity_timeout)
             path=write_new(args.output,result)
             result={k:v for k,v in result.items() if k not in ("quality_review","rust_diagnostics")}|{"path":path}
+        elif args.command == "student-rust-compare-projection":
+            if Path(args.output).exists() or Path(args.output).is_symlink():
+                raise ValueError("output must be a new file")
+            result=compare_projection(args.root,expected_package_id=args.expected_package_id,
+                baseline_executable=args.baseline_executable,experiment_executable=args.experiment_executable,
+                timeout_seconds=args.timeout_seconds)
+            path=write_new(args.output,result)
+            result=result|{"path":path}
         elif args.command == "student-rust-profile":
             if Path(args.output).exists() or Path(args.output).is_symlink():
                 raise ValueError("output must be a new file")

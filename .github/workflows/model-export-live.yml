@@ -9,6 +9,9 @@ on:
       - 'src/rpdistill/evaluation.py'
       - 'src/rpdistill/rust_parity.py'
       - 'src/rpdistill/rust_profile.py'
+      - 'src/rpdistill/projection_experiment.py'
+      - 'scripts/apply_projection_experiment.py'
+      - 'tests/test_projection_experiment.py'
       - 'tests/test_rust_profile.py'
       - 'scripts/rpdistill_candidate_infer.rs'
       - 'src/rpdistill/student.py'
@@ -26,7 +29,7 @@ permissions:
   contents: read
 jobs:
   full-export-rust-parity:
-    timeout-minutes: 20
+    timeout-minutes: 25
     runs-on: ubuntu-latest
     env:
       HF_HUB_OFFLINE: '1'
@@ -50,4 +53,10 @@ jobs:
       - run: cp scripts/rpdistill_candidate_infer.rs d-reference/rptranslate/crates/rpinfer/examples/
       - run: cargo build --locked --release -p rpinfer --example rpdistill_candidate_infer
         working-directory: d-reference/rptranslate
-      - run: python scripts/model_export_smoke.py d-reference/rptranslate/target/release/examples/rpdistill_candidate_stream d-reference/rptranslate/target/release/examples/verify_package d-reference/rptranslate/target/release/examples/rpdistill_candidate_infer
+      - run: cp d-reference/rptranslate/target/release/examples/rpdistill_candidate_infer "${RUNNER_TEMP}/rpdistill-baseline"
+      - run: python scripts/apply_projection_experiment.py d-reference
+      - run: cargo test --locked --release -p rpinfer --lib
+        working-directory: d-reference/rptranslate
+      - run: cargo build --locked --release -p rpinfer --example rpdistill_candidate_infer
+        working-directory: d-reference/rptranslate
+      - run: python scripts/model_export_smoke.py d-reference/rptranslate/target/release/examples/rpdistill_candidate_stream d-reference/rptranslate/target/release/examples/verify_package "${RUNNER_TEMP}/rpdistill-baseline" d-reference/rptranslate/target/release/examples/rpdistill_candidate_infer

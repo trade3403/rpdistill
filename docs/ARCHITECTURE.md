@@ -78,3 +78,5 @@ E9b2 export_review.py：候选 pin 与 source 全张量对照、默认质量/盲
 E9b2 交接：原 export_review.py 继续作为唯一审批实现；签发前复核候选与当前本地训练权利，full-state 校验 token data_sha256。独立 receipt 和 package 的双外部 pin 检查验证绑定及嵌套报告，不重新授权或启动生产模型。
 
 E10a rust_profile.py：外部 pin 校验 → 可信 Rust bridge --profile（不改变原 parity 二进制协议）→ 固定合成 workload、加载/encoder/prepare/full/cache 计时、warmup/重复与生成一致性 → 有界协议解析、median/实际 token throughput/进程峰值 RSS、报告 hash；同一进程加载一次，OS 缓存不控制，性能不等于生产 SLA。原 D 只读。
+
+E10b projection_experiment.py：同一外部 pin package → 原版及临时实验版 Rust trusted executables → 完整短诊断字节一致 → 相同两组 workload 运行/profile 比较；词表投影最多4个独立行分片，原 FP32 累加顺序、共享权重及边界保持。D 原仓库只读，实验不授权生产使用。

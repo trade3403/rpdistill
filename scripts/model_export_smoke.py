@@ -18,12 +18,14 @@ from rpdistill.training_data import acquire_assets,ASSET_BYTES
 from rpdistill.model_export import export_candidate,verify_package,REQUIRED_BYTES,PAYLOAD
 from rpdistill.rust_parity import rust_parity
 from rpdistill.rust_profile import rust_profile
+from rpdistill.projection_experiment import compare_projection
 from rpdistill.export_review import verify_source_weights,check_integration_receipt
 
 torch.set_num_threads(2)
 exe=Path(sys.argv[1]).resolve()
 official=Path(sys.argv[2]).resolve()
 bridge=Path(sys.argv[3]).resolve()
+experiment_bridge=Path(sys.argv[4]).resolve()
 with tempfile.TemporaryDirectory() as tmp:
     root=Path(tmp)
     assets=root/"assets"
@@ -103,6 +105,12 @@ with tempfile.TemporaryDirectory() as tmp:
     assert all(c["measured_repeats"]==3 and c["actual_generated_tokens"]>0 for c in profile["cases"])
     assert not profile["quality_test"] and not profile["release_ready"]
     print(json.dumps({"actual_rust_profile":True,"profile":profile}))
+    comparison=compare_projection(root/"candidate",expected_package_id=m["package_id"],
+        baseline_executable=bridge,experiment_executable=experiment_bridge,
+        timeout_seconds=300,baseline_profile=profile)
+    assert comparison["bitwise_diagnostic_parity"] and len(comparison["comparisons"])==2
+    assert not comparison["release_ready"] and not comparison["speed_threshold_enforced"]
+    print(json.dumps({"actual_projection_experiment":True,"comparison":comparison}))
     # Current official package loader MUST reject the distinct package.
     rejected=subprocess.run([str(official),str(root/"candidate")],capture_output=True)
     assert rejected.returncode!=0,"official package loader accepted independent candidate"
