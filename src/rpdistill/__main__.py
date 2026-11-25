@@ -30,6 +30,7 @@ from .student_evaluation import GenerationConfig, evaluate_checkpoint
 from .quality_review import leakage_audit, create_blind_review, collect_review, ReviewGate
 from .compression import plan as compression_plan, create_candidate
 from .compression_review import RegressionGate, compare_candidates
+from .model_export import export_plan, export_candidate, verify_package
 
 
 def runtime_info() -> dict[str, str]:
@@ -39,7 +40,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E8b",
+        "stage": "E9a",
     }
 
 
@@ -321,6 +322,19 @@ def parser() -> argparse.ArgumentParser:
     compare.add_argument("--max-cases",type=int,default=1000)
     compare.add_argument("--max-seconds",type=float,default=3600)
     compare.add_argument("--output",required=True)
+    commands.add_parser("student-export-plan")
+    export=commands.add_parser("student-export-candidate")
+    export.add_argument("version")
+    export.add_argument("--checkpoint",required=True)
+    export.add_argument("--assets",required=True)
+    export.add_argument("--output",required=True)
+    export.add_argument("--license-label",required=True)
+    export.add_argument("--rights-note",required=True)
+    export.add_argument("--max-bytes",type=int,required=True)
+    export.add_argument("--acknowledge-candidate-only",action="store_true")
+    verify_export=commands.add_parser("student-verify-package")
+    verify_export.add_argument("--root",required=True)
+    verify_export.add_argument("--expected-package-id",required=True)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -334,6 +348,14 @@ def main(argv=None) -> int:
             result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
             path=write_new(args.output,result)
             result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "student-export-plan":
+            result=export_plan()
+        elif args.command == "student-export-candidate":
+            result=export_candidate(args.checkpoint,args.assets,args.output,dataset_version=args.version,
+                license_label=args.license_label,rights_note=args.rights_note,max_bytes=args.max_bytes,
+                acknowledge_candidate_only=args.acknowledge_candidate_only)
+        elif args.command == "student-verify-package":
+            result=verify_package(args.root,expected_package_id=args.expected_package_id)
         elif args.command == "benchmark-compression":
             if Path(args.output).exists() or Path(args.output).is_symlink():
                 raise ValueError("output must be a new file")

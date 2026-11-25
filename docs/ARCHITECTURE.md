@@ -68,3 +68,5 @@ E7b2 quality_review.py：冻结 benchmark + 训练快照 → 有界 trigram 倒�
 E8a compression.py：已完成训练 checkpoint → canonical FP32 权重 → FP32/矩阵 FP16/rowwise symmetric INT8+FP32 scale（位置/偏置/norm 保留 FP32）→ SafeTensors 压缩候选与内容哈希、误差、源 identity、预算 → 严格 FP32 参考还原。D 线最新 5389f3f 仅官方 F32，候选非 RPModel、无原生低精度推理；E8b 质量回归，E9 自训练包。
 
 E8b compression_review.py：原训练 checkpoint + 冻结 benchmark + 压缩候选 → 严格读取与重算源转换 → 相同 CPU FP32 greedy/指标 → 固定绝对门槛、相对回归、新增逐条规则错误及词面泄漏审计 → 按实际 artifact bytes 最小合格候选，失败则 null；有界 case/软时间预算、报告内容 hash，release_ready=false。
+
+E9a model_export.py：已完成固定 profile checkpoint → canonical FP32 SafeTensors + 5 pinned tokenizer/config assets → 独立 rpdistill-model-candidate-v1 manifest 与外部 package pin、来源/许可说明和文件校验 → 不覆盖候选目录。官方 RPModel v1 仍独立，Rust raw reader CI 对照非生产模型加载；E9b 独立加载/质量 gate。详见 MODEL_CANDIDATE_FORMAT.md。

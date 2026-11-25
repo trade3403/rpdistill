@@ -1,0 +1,43 @@
+name: Independent model export Rust parity
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/rpdistill/model_export.py'
+      - 'src/rpdistill/student.py'
+      - 'src/rpdistill/student_evaluation.py'
+      - 'src/rpdistill/distill.py'
+      - 'src/rpdistill/resumable.py'
+      - 'src/rpdistill/training_data.py'
+      - 'src/rpdistill/transfer.py'
+      - 'scripts/model_export_smoke.py'
+      - 'scripts/rpdistill_candidate_stream.rs'
+      - 'pyproject.toml'
+      - '.github/workflows/model-export-live.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-export-rust-parity:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    env:
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: trade3403/ai-research-pdf-reader
+          ref: cce002dd2667e6fcd0ec4c86c9b41a3da144b26e
+          path: d-reference
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
+      - run: python -m pip install -e '.[student]'
+      - run: cp scripts/rpdistill_candidate_stream.rs d-reference/rptranslate/crates/rpmodel/examples/
+      - run: cargo build --locked --release -p rpmodel --example rpdistill_candidate_stream --example verify_package
+        working-directory: d-reference/rptranslate
+      - run: python scripts/model_export_smoke.py d-reference/rptranslate/target/release/examples/rpdistill_candidate_stream d-reference/rptranslate/target/release/examples/verify_package
