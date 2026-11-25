@@ -1,12 +1,14 @@
 import unittest
 from rpdistill.rust_profile import parse_profile
 
-def fixture():
+def fixture(*,early_eos_lengths=()):
     rows=["rpdistill-profile-v1","load\t1\t2\t3\t4\t5\t6"]
     for length,n in ((16,8),(64,16)):
-        ids="65000,"+",".join(["4"]*n)
+        ended=length in early_eos_lengths
+        ids="65000,0" if ended else "65000,"+",".join(["4"]*n)
+        flag="true" if ended else "false"
         for repeat in (1,2,3):
-            rows.append(f"case\t{length}\t{n}\t{repeat}\t10\t20\t{100*repeat}\t{50*repeat}\tfalse\t{ids}")
+            rows.append(f"case\t{length}\t{n}\t{repeat}\t10\t20\t{100*repeat}\t{50*repeat}\t{flag}\t{ids}")
     return ("\n".join(rows+["rss\t123456"])+"\n").encode("ascii")
 
 class RustProfileTests(unittest.TestCase):
@@ -27,8 +29,18 @@ class RustProfileTests(unittest.TestCase):
                 parse_profile(bad)
 
     def test_early_eos(self):
-        raw=fixture()
-        raw=raw.replace(("false\t65000,"+",".join(["4"]*8)).encode(),b"true\t65000,0")
-        r=parse_profile(raw)
-        self.assertEqual(r["cases"][0]["actual_generated_tokens"],1)
-        self.assertTrue(r["cases"][0]["ended"])
+        for lengths in ((16,),(64,),(16,64)):
+            with self.subTest(early_eos_lengths=lengths):
+                r=parse_profile(fixture(early_eos_lengths=lengths))
+                for case in r["cases"]:
+                    ended=case["source_tokens"] in lengths
+                    self.assertEqual(case["ended"],ended)
+                    self.assertEqual(case["actual_generated_tokens"],1 if ended else case["max_new_tokens"])
+                    if ended:
+                        self.assertEqual(case["greedy_ids"],[65000,0])
+
+    def test_eos_with_trailing_tokens_rejected(self):
+        raw=fixture(early_eos_lengths=(16,))
+        bad=raw.replace(b"true\t65000,0\n",b"true\t65000,0,4\n",1)
+        with self.assertRaisesRegex(ValueError,"invalid generated IDs"):
+            parse_profile(bad)
