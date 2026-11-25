@@ -35,3 +35,6 @@ E1.1 仅实现标准库基础配置和 CLI；以上其余模块为计划。
 
 ## E2.3 教师推理接口
 `TeacherTranslator` 消费固定版本 TeacherRegistry 记录，重校验清单并通过本地 Transformers causal 模型生成候选双语段落，默认英文到中文、CPU float32，可显式选择 CUDA。禁止远程自定义代码与 pickle 权重。输出保留源文本、模型来源/版本、提示版本、配置和结束原因，E3 只在质量过滤后将候选纳入训练集。超长输入拒绝而不截断；E3 负责分段。免费 Runner 使用随机微型模型做真实 CPU 推理，不能代替科研翻译质量验证。
+
+## E3.1 论文发现接口
+`PaperQuery` 构造有界 Europe PMC 官方 REST 查询，`discover` 分页检查记录并入库 `PaperCatalog`。DOI/PMCID/source ID 去重，标识冲突不自动合并，许可冲突降级。只存元数据（不存摘要），默认 OA 筛选。CC BY/CC0+OA+PMCID 仅标为 pending_fulltext_license；E3.2 必须复核具体全文许可及第三方内容限制，不自动将发现结果用于训练。检索领域先覆盖生命科学/医学，其他来源后续扩展。参考 https://europepmc.org/RestfulWebService 。

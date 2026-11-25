@@ -14,6 +14,7 @@ from dataclasses import asdict
 from .downloads import DownloadQueue
 from .modelscope_source import search_models, revisions, download_modelscope
 from .inference import TranslationOptions, load_teacher
+from .papers import PaperQuery, PaperCatalog, discover
 
 
 def runtime_info() -> dict[str, str]:
@@ -23,7 +24,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E2.3",
+        "stage": "E3.1",
     }
 
 
@@ -87,6 +88,16 @@ def parser() -> argparse.ArgumentParser:
     translate.add_argument("--max-new-tokens", type=int, default=1024)
     translate.add_argument("--batch-size", type=int, default=1)
     translate.add_argument("--input", required=True, help="UTF-8 JSON array of source strings")
+    papers = commands.add_parser("paper-search")
+    papers.add_argument("--keyword", action="append", required=True)
+    papers.add_argument("--subject")
+    papers.add_argument("--start-date", required=True)
+    papers.add_argument("--end-date", required=True)
+    papers.add_argument("--language", default="eng")
+    papers.add_argument("--limit", type=int, default=100)
+    papers.add_argument("--include-closed", action="store_true")
+    listing = commands.add_parser("paper-list")
+    listing.add_argument("--limit", type=int, default=100)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -98,6 +109,13 @@ def main(argv=None) -> int:
             result = runtime_info()
         elif args.command == "devices":
             result = device_report(args.path)
+        elif args.command == "paper-search":
+            query = PaperQuery(tuple(args.keyword), args.start_date, args.end_date,
+                               subject=args.subject, language=args.language or None,
+                               limit=args.limit, open_access_only=not args.include_closed)
+            result = discover(query, PaperCatalog(args.db))
+        elif args.command == "paper-list":
+            result = PaperCatalog(args.db).list(args.limit)
         elif args.command == "teacher-translate":
             input_path = Path(args.input)
             if input_path.stat().st_size > 8 * 1024 * 1024:

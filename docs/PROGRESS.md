@@ -1,7 +1,7 @@
 # RPDistill 研发进度与验收台账
 
 更新时间：2026-11-25（更新）
-仓库：trade3403/rpdistill；分支：main；版本：V0.1.0；当前阶段：E1.1 CPU CI 已通过，E1.2 CPU CI 六环境已通过；E2.1 CPU CI 六环境已通过；E2.2a CPU CI 六环境已通过；E2.2b1 CPU CI 六环境通过；E2.2b2 标准 CI/联网 smoke 9/9 通过；E2.3 已提交待验收。
+仓库：trade3403/rpdistill；分支：main；版本：V0.1.0；当前阶段：E1.1 CPU CI 已通过，E1.2 CPU CI 六环境已通过；E2.1 CPU CI 六环境已通过；E2.2a CPU CI 六环境已通过；E2.2b1 CPU CI 六环境通过；E2.2b2 标准 CI/联网 smoke 9/9 通过；E2.3 标准 CI/联网回归 10/10 通过；E3.1 已提交待验收。
 
 ## 当前阶段
 
@@ -32,8 +32,9 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E2.2a | 持久化队列、文件级校验进度、协作控制 | CPU CI 六环境通过 |
 | E2.2b1 | ModelScope 基础搜索、固定版本下载与注册 | CPU CI 六环境通过 |
 | E2.2b2 | HF 字节进度/Range、SDK 兼容及联网 smoke | 9/9 CI 通过 |
-| E2.3 | 教师加载翻译、真实微型 CPU 推理 | 已提交，待 CI |
-| E3 | 科研语料生成清洗 | 待开发 |
+| E2.3 | 教师加载翻译、真实微型 CPU 推理 | 10/10 CI 通过 |
+| E3.1 | Europe PMC 论文检索、许可预筛、元数据去重 | 已提交，待 CI |
+| E3 后续 | 全文许可复核、下载、解析及语料生成 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
 | E6 | GPU 训练及断点恢复 | 待开发 |
@@ -53,7 +54,7 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 
 ## 下一步
 
-核验 E2.3 标准 CI 与真实微型 CPU 推理 job，全部成功后进入 E3.1 论文检索及许可过滤。
+核验 E3.1 标准 CI 与独立论文联网 smoke；通过后进入 E3.2 全文许可复核和合法 XML 下载。
 
 ## 强制维护约定
 
@@ -94,3 +95,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E2.2b2 验收与 E2.3 开发
 提交 dbe106f1c112215e884cce9e30f6c1ab8c45a86e：[标准 CI 45586043352](https://github.com/trade3403/rpdistill/actions/runs/45586043352) 7/7、[联网 smoke 45586043462](https://github.com/trade3403/rpdistill/actions/runs/45586043462) 2/2 全部 success。仅小配置下载及真实检索，无真实大模型下载。E2.3 新增 inference.py、注册表精确版本查询、清单再校验、本地 SafeTensors 加载、CPU/CUDA 显式选择、确定性生成、输入/输出 token 预算、批量翻译及来源元数据；新增 6 个单元测试方法，累计 52 个。CI 新增实际 PyTorch CPU 随机微型模型推理，不下载预训练权重；本次新提交仍待 CI。Qwen 具体版本、真实翻译质量、GPU/显存实测待用户电脑及 E7；ModelScope 字节级控制仍待完善。下一步 E3.1 论文搜索及许可过滤。
+
+## E2.3 验收与 E3.1 开发
+提交 b1fce260eda9af4676a25192daf6fa665834c3a6：[标准 CI 45586949170](https://github.com/trade3403/rpdistill/actions/runs/45586949170) 8/8（含真实微型 CPU 推理），[联网回归 45586948901](https://github.com/trade3403/rpdistill/actions/runs/45586948901) 2/2 全部 success。E3.1 新增 papers.py、Europe PMC REST 官方 API 查询、关键词/主题词、日期、语言、OA 筛选、分页上限、DOI/PMCID/provider ID 去重、许可预筛与 SQLite 目录、CLI paper-search/paper-list。新增 9 个单元测试方法，累计 61 个，独立论文联网 smoke 最多检查 3 条记录。不下载全文、保存摘要或授权训练；CC BY/CC0 仅为待全文权利复核候选。来源学科覆盖以生命科学/医学为主，其他平台后续接入。新提交待 CI；下一步 E3.2 合法全文许可复核/下载，之后解析、翻译清洗与跨来源扩展。
