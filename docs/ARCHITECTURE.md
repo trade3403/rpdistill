@@ -44,3 +44,5 @@ E3.1 增加 NCBI PMC E-utilities 备用来源：ESearch（OA 与 CC BY/CC0 搜�
 E3.2：NCBI PMC 默认，Europe PMC 暂缓。FulltextLibrary 消费 PaperCatalog 候选，经官方 OAI-PMH pmc_fm→pmc 验证身份及许可 URI，一致才原子保存原始 XML 并记录哈希、来源、许可、状态。SQLite 单篇写事务串行，累计响应字节及单篇大小限制，缓存基于哈希。原始 XML 状态 downloaded_pending_content_review，E3.3 需排除第三方限制材料，保持署名和许可，不自动训练。官方：https://pmc.ncbi.nlm.nih.gov/tools/oai/ 。
 
 E3.3a CorpusStore：输入已登记 PMC XML 和 PaperCatalog，检查当前资格、哈希、许可、日期；仅提取保守正文/摘要文本段，排除复杂结构和明确限制标记。每段存来源、署名、许可、论文级固定划分及哈希；教师版本/选项/提示与质量策略共同生成候选译文幂等键。数字和长度等基础筛查仅为候选筛选，候选 JSONL 不作为训练认证。后续 E3.3b 增加更完整的权利、语义、语言和数据集版本/冻结/自动调度能力。
+
+E3.3b DatasetStore 保存不可覆盖的内容寻址候选快照与成员，按固定教师配置筛选、重新哈希当前全文、精确源文本跨版本 split 防护，计数门槛不足不生成版本；导出校验哈希且不覆盖。CorpusPipeline 单次循环串联检索到候选快照，持久阶段，单 worker，解析/翻译/快照恢复；采集失败不自动重放预算。现有共享目录候选不严格按本次查询隔离，持续运行、增量分页、语义质量与训练授权留后续。

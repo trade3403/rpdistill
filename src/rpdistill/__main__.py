@@ -18,6 +18,8 @@ from .papers import PaperQuery, PaperCatalog
 from .ncbi_papers import discover_with_source
 from .fulltext import FulltextLibrary
 from .corpus import CorpusStore
+from .datasets import DatasetStore, DatasetGate
+from .pipeline import CorpusPipeline
 
 
 def runtime_info() -> dict[str, str]:
@@ -27,7 +29,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E3.3a",
+        "stage": "E3.3b",
     }
 
 
@@ -127,6 +129,39 @@ def parser() -> argparse.ArgumentParser:
     export = commands.add_parser("corpus-export")
     export.add_argument("--output", required=True)
     export.add_argument("--limit", type=int, default=10000)
+    dataset = commands.add_parser("dataset-create")
+    pipeline = commands.add_parser("pipeline-create")
+    for cmd in (dataset,pipeline):
+        cmd.add_argument("model_id")
+        cmd.add_argument("--revision",required=True)
+        cmd.add_argument("--source",choices=["huggingface","modelscope"],default="huggingface")
+        cmd.add_argument("--device",default="cpu")
+        cmd.add_argument("--dtype",default="float32")
+        cmd.add_argument("--batch-size",type=int,default=1)
+        cmd.add_argument("--max-input-tokens",type=int,default=2048)
+        cmd.add_argument("--max-new-tokens",type=int,default=1024)
+        cmd.add_argument("--min-train",type=int,default=10)
+        cmd.add_argument("--min-validation",type=int,default=1)
+        cmd.add_argument("--min-test",type=int,default=1)
+        cmd.add_argument("--max-pairs",type=int,default=10000)
+    pipeline.add_argument("--keyword",action="append",required=True)
+    pipeline.add_argument("--subject")
+    pipeline.add_argument("--start-date",required=True)
+    pipeline.add_argument("--end-date",required=True)
+    pipeline.add_argument("--search-limit",type=int,default=100)
+    pipeline.add_argument("--paper-limit",type=int,default=20)
+    pipeline.add_argument("--segment-limit",type=int,default=1000)
+    pipeline.add_argument("--max-bytes",type=int,required=True)
+    pipeline.add_argument("--root",default=str(Path.home()/".rpdistill"/"papers"))
+    commands.add_parser("dataset-list")
+    ds_export = commands.add_parser("dataset-export")
+    ds_export.add_argument("version")
+    ds_export.add_argument("--output",required=True)
+    for action in ("run","show","resume"):
+        cmd = commands.add_parser("pipeline-"+action)
+        cmd.add_argument("id")
+        if action=="resume":
+            cmd.add_argument("--worker-stopped",action="store_true")
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -148,6 +183,31 @@ def main(argv=None) -> int:
                 max_bytes=args.max_bytes, limit=args.limit)
         elif args.command == "paper-fulltexts":
             result = FulltextLibrary(args.db, args.root).list()
+        elif args.command in ("dataset-create","pipeline-create"):
+            options=TranslationOptions(device=args.device,dtype=args.dtype,batch_size=args.batch_size,
+                max_input_tokens=args.max_input_tokens,max_new_tokens=args.max_new_tokens)
+            gate=DatasetGate(args.min_train,args.min_validation,args.min_test,args.max_pairs)
+            if args.command=="dataset-create":
+                result=DatasetStore(args.db).create(args.model_id,args.revision,options,
+                    source=args.source,gate=gate)
+            else:
+                query=PaperQuery(tuple(args.keyword),args.start_date,args.end_date,
+                    subject=args.subject,limit=args.search_limit)
+                result=CorpusPipeline(args.db).create(query,args.model_id,args.revision,options,
+                    root=args.root,max_bytes=args.max_bytes,paper_limit=args.paper_limit,
+                    segment_limit=args.segment_limit,gate=gate,source=args.source)
+        elif args.command=="dataset-list":
+            result=DatasetStore(args.db).list()
+        elif args.command=="dataset-export":
+            result=DatasetStore(args.db).export(args.version,args.output)
+        elif args.command in ("pipeline-run","pipeline-show","pipeline-resume"):
+            engine=CorpusPipeline(args.db)
+            if args.command=="pipeline-run":
+                result=engine.run(args.id)
+            elif args.command=="pipeline-resume":
+                result=engine.resume(args.id,worker_stopped=args.worker_stopped)
+            else:
+                result=engine.get(args.id)
         elif args.command == "corpus-parse":
             result = CorpusStore(args.db).parse(args.root,limit=args.limit,max_chars=args.max_chars)
         elif args.command == "corpus-list":

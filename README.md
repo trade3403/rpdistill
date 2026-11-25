@@ -98,3 +98,7 @@ E3.2 首次真实全文 smoke 发现 JATS 多种标识和许可表达兼容问�
 
 ### E3.3a 论文解析和候选双语语料
 E3.2 修复版标准 CI 8/8、NCBI 联网 2/2 通过，真实下载 10 篇 CC BY 全文，接收 1,436,306 字节。Europe PMC 授权暂缓。E3.3a 新增 `paper-download` 后的 `corpus-parse`、`corpus-list`、`corpus-translate MODEL_ID --revision FULL_SHA`、`corpus-export --output candidates.jsonl`。提取正文/摘要中保守允许的英文拉丁字符比例较高的纯文本段落，保留署名及许可、源文件哈希、论文级固定划分；排除复杂公式、图表、引用块、明确第三方权利标记及超长不可安全切分句子，不截断。教师译文经完成状态、数字、长度、原文复写检查后仅生成候选 JSONL（training_ready=false）；不保证语义正确、语言或版权完全核实。真实教师与训练数据集门槛在后续 E3.3b/E7，需加入语言识别、术语/公式和语义检查、可恢复调度及版本化数据集。CLI 目前分阶段调用，不是一键自动蒸馏。新增真实联网 XML 解析断言，待 CI。
+
+### E3.3b 候选数据集快照与单次流水线
+E3.3a 标准 CI 8/8 与 NCBI 真实联网 2/2 通过，实际下载 10 篇并提取 337 段候选原文。新增 `dataset-create MODEL_ID --revision FULL_SHA`（固定教师、选项与最低 train/validation/test 数量）、`dataset-list`、`dataset-export VERSION --output dataset.jsonl`。内容寻址不可覆盖快照，保留成员和哈希，持久化精确源文本 split 约束防止跨版本精确重复泄漏；不是语义近重复检测或正式冻结评测集。快照仅为历史候选，training_ready=false，后续训练前仍须复核当前权利与质量。
+`pipeline-create MODEL_ID --revision FULL_SHA --keyword malaria --start-date 2024-01-01 --end-date 2024-12-31 --max-bytes 8388608` 返回任务 ID；`pipeline-run ID` 一次串联 NCBI 搜索→项目目录内已有/新增候选下载→解析→教师批量翻译→候选快照；`pipeline-show ID` 查看持久阶段；`pipeline-resume ID` 后接 `pipeline-run ID` 从解析/翻译/快照失败处恢复。采集阶段失败需创建新授权预算周期，避免重复消耗未记账流量；崩溃恢复需确认 worker 停止。当前共享目录的单次循环与有限任务预算，不是持续定时任务，不保证严格只处理当次检索记录；完整增量分页、跨来源、正式训练门槛、语义与许可验收待后续。真实教师质量在本机验收，CPU CI 为合成样例/模拟教师加已有真实微型模型推理。
