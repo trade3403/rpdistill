@@ -10,6 +10,8 @@ import sqlite3
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request
+from urllib.error import HTTPError, URLError
+from email.utils import parsedate_to_datetime
 import time
 
 from .transfer import open_https
@@ -70,11 +72,50 @@ class PaperQuery:
         return " AND ".join(clauses)
 
 
-def fetch_page(params):
+def retry_delay(error, attempt):
+    delay = 2 ** (attempt + 1)
+    if isinstance(error, HTTPError):
+        value = error.headers.get("Retry-After") if error.headers else None
+        if value:
+            try:
+                requested = int(value)
+            except ValueError:
+                try:
+                    stamp = parsedate_to_datetime(value)
+                    if stamp.tzinfo is None:
+                        stamp = stamp.replace(tzinfo=timezone.utc)
+                    requested = (stamp - datetime.now(timezone.utc)).total_seconds()
+                except (ValueError, TypeError, OverflowError):
+                    requested = 0
+            delay = max(delay, requested)
+    # Respect long server backoff by aborting instead of retrying too early.
+    if delay > 60:
+        raise error
+    return delay
+
+
+def fetch_page(params, *, opener=open_https, sleep=time.sleep, attempts=4):
+    if type(attempts) is not int or not 1 <= attempts <= 5:
+        raise ValueError("attempts must be 1–5")
     request = Request(ENDPOINT + "?" + urlencode(params),
                       headers={"Accept":"application/json", "User-Agent":"RPDistill/0.1"})
-    with open_https(request, timeout=30) as response:
-        raw = response.read(MAX_RESPONSE + 1)
+    for attempt in range(attempts):
+        try:
+            with opener(request, timeout=30) as response:
+                raw = response.read(MAX_RESPONSE + 1)
+            break
+        except (HTTPError, URLError, TimeoutError, ConnectionError) as exc:
+            if isinstance(exc, HTTPError):
+                transient = exc.code in (408, 429, 500, 502, 503, 504)
+                exc.close()
+            elif isinstance(exc, URLError):
+                import ssl
+                transient = not isinstance(exc.reason, ssl.SSLError)
+            else:
+                transient = True
+            if not transient or attempt == attempts - 1:
+                raise
+            sleep(retry_delay(exc, attempt))
     if len(raw) > MAX_RESPONSE:
         raise ValueError("Europe PMC metadata response exceeds limit")
     data = json.loads(raw)

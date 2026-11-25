@@ -98,3 +98,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E2.3 验收与 E3.1 开发
 提交 b1fce260eda9af4676a25192daf6fa665834c3a6：[标准 CI 45586949170](https://github.com/trade3403/rpdistill/actions/runs/45586949170) 8/8（含真实微型 CPU 推理），[联网回归 45586948901](https://github.com/trade3403/rpdistill/actions/runs/45586948901) 2/2 全部 success。E3.1 新增 papers.py、Europe PMC REST 官方 API 查询、关键词/主题词、日期、语言、OA 筛选、分页上限、DOI/PMCID/provider ID 去重、许可预筛与 SQLite 目录、CLI paper-search/paper-list。新增 9 个单元测试方法，累计 61 个，独立论文联网 smoke 最多检查 3 条记录。不下载全文、保存摘要或授权训练；CC BY/CC0 仅为待全文权利复核候选。来源学科覆盖以生命科学/医学为主，其他平台后续接入。新提交待 CI；下一步 E3.2 合法全文许可复核/下载，之后解析、翻译清洗与跨来源扩展。
+
+## E3.1 联网失败与修复
+提交 fadf2ab3e3307923e57451da0e601cfae6774d0b 对应 [标准 CI 45588253788](https://github.com/trade3403/rpdistill/actions/runs/45588253788) 8/8 success；[论文联网 smoke 45588253824](https://github.com/trade3403/rpdistill/actions/runs/45588253824) failure，真实日志 Europe PMC HTTP 503。新增有界瞬态重试（默认 4 次尝试、2/4/8 秒退避，遵守 Retry-After，超过 60 秒则终止以免过早请求；永久 HTTP 错误、TLS 错误不重试）。保持真实联网测试的成功断言，不吞掉失败或改用模拟结果。新增 5 个测试方法，累计 66 个；新修复待标准与联网 CI 复验。未进入 E3.2。

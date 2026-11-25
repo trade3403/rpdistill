@@ -83,3 +83,60 @@ class PaperTests(unittest.TestCase):
         self.assertEqual(stats["invalid"], 1)
         self.assertEqual(stats["pages"], 1)
         self.assertEqual(self.catalog.list(), [])
+
+
+class NetworkRetryTests(unittest.TestCase):
+    def error(self, status, retry_after=None):
+        from urllib.error import HTTPError
+        from email.message import Message
+        headers = Message()
+        if retry_after is not None:
+            headers["Retry-After"] = retry_after
+        return HTTPError("https://example.invalid", status, "test", headers, None)
+
+    def test_transient_503_then_success(self):
+        from io import BytesIO
+        from rpdistill.papers import fetch_page
+        opener = Mock(side_effect=[self.error(503), BytesIO(b'{"resultList":{}}')])
+        sleep = Mock()
+        self.assertEqual(fetch_page({}, opener=opener, sleep=sleep), {"resultList":{}})
+        self.assertEqual(opener.call_count, 2)
+        sleep.assert_called_once_with(2)
+
+    def test_rate_limit_retry_after(self):
+        from io import BytesIO
+        from rpdistill.papers import fetch_page
+        opener = Mock(side_effect=[self.error(429, "5"), BytesIO(b'{}')])
+        sleep = Mock()
+        self.assertEqual(fetch_page({}, opener=opener, sleep=sleep), {})
+        sleep.assert_called_once_with(5)
+
+    def test_permanent_error_no_retry(self):
+        from urllib.error import HTTPError
+        from rpdistill.papers import fetch_page
+        opener = Mock(side_effect=self.error(400))
+        sleep = Mock()
+        with self.assertRaises(HTTPError):
+            fetch_page({}, opener=opener, sleep=sleep)
+        opener.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_exhausted_retries_propagate(self):
+        from urllib.error import HTTPError
+        from rpdistill.papers import fetch_page
+        opener = Mock(side_effect=[self.error(503) for _ in range(4)])
+        sleep = Mock()
+        with self.assertRaises(HTTPError):
+            fetch_page({}, opener=opener, sleep=sleep)
+        self.assertEqual(opener.call_count, 4)
+        self.assertEqual([x.args[0] for x in sleep.call_args_list], [2,4,8])
+
+    def test_long_retry_after_stops(self):
+        from urllib.error import HTTPError
+        from rpdistill.papers import fetch_page
+        opener = Mock(side_effect=self.error(429, "120"))
+        sleep = Mock()
+        with self.assertRaises(HTTPError):
+            fetch_page({}, opener=opener, sleep=sleep)
+        opener.assert_called_once()
+        sleep.assert_not_called()
