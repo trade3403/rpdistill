@@ -140,3 +140,17 @@ class NetworkRetryTests(unittest.TestCase):
             fetch_page({}, opener=opener, sleep=sleep)
         opener.assert_called_once()
         sleep.assert_not_called()
+
+
+class EuropePMCRequestContractTests(unittest.TestCase):
+    def test_documented_sort_field_and_date_filter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = PaperCatalog(Path(directory) / "db")
+            query = PaperQuery(("malaria",), "2024-01-01", "2024-12-31", limit=3)
+            fetch = Mock(return_value={"resultList":{"result":[]}})
+            discover(query, catalog, fetch=fetch, sleep=Mock())
+            params = fetch.call_args.args[0]
+            self.assertEqual(params["sort"], "P_PDATE_D desc")
+            self.assertIn("FIRST_PDATE:[2024-01-01 TO 2024-12-31]", params["query"])
+            self.assertEqual(params["resultType"], "core")
+            self.assertEqual(params["pageSize"], 3)

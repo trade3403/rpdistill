@@ -107,3 +107,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E3.1 双来源实际验收（仍有阻塞）
 代码提交 97d7c3a6aaca1a88e73d514bacca9e33f03cb7bc：[标准 CI 45589377280](https://github.com/trade3403/rpdistill/actions/runs/45589377280) 8/8 success；[双来源联网 45589377415](https://github.com/trade3403/rpdistill/actions/runs/45589377415) 首次 attempt：NCBI PMC job 139119203251 success（实际日志 inspected=3, inserted=3, duplicate=0, conflict=0, invalid=0），Europe PMC job 139119202890 failure（HTTP 503，重试后仍失败）。已确认官方 REST URL 与公开文档一致；官方论坛曾报告 HTTP 503 与流量上升，但本次具体原因未知。未改变验收门槛或测试代码，已成功请求仅重跑此 workflow 的失败 job；等待实际结果。文档提交单独触发标准 CI，论文联网结果仍以对应代码 SHA 的上述 run 为准。E3.2 尚未启动。若持续不可用，需用户明确同意调整外部服务验收门槛，不能直接将失败判为通过。
+
+## E3.1 Europe PMC 排序参数修正
+文档提交 5ddb3b25f10cd7cb17635b74fae18e4334d7fbcf 的标准 CI 45592551774 8/8 success；联网 run 45589377415 attempt 3 再次 failure，Europe PMC job 139138835459 HTTP 503，NCBI PMC success。进一步对照 Europe PMC REST 官方 Sorting Results（https://staging.europepmc.org/RestfulWebService）及公开 EBI-Metabolights 实例，修正 sort 从 FIRST_PDATE desc 为 P_PDATE_D desc；保留 FIRST_PDATE 日期范围过滤，保留真实联网断言、重试与原验收门槛。打印出版日期排序与首次发表日期筛选语义不同，不承诺按首次发表日期全局严格排序。新增请求契约测试 1 项，累计 74 个测试方法。503 是否由旧排序字段引起尚未确认；新提交待两套 CI 实测。未进入 E3.2。

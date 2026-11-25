@@ -50,3 +50,5 @@ E3.1 标准 CI 45588253788 8/8 已通过；论文联网 45588253824 因 Europe P
 E3.1 修复标准 CI 45588726018 8/8 成功，但真实 Europe PMC 45588726112 重试后仍 HTTP 503。新增 NCBI PMC 备用检索、CLI --provider auto/europe-pmc/ncbi-pmc 及独立联网 job，保留原 Europe PMC job。先核验本次标准 CI 与两个 provider 联网结果；若 Europe PMC 持续不可用，不将其标绿，需单独记录外部阻塞。累计 73 测试方法，未进入 E3.2。后续全文使用 PMC 当前 OAI-PMH / Cloud Service 等官方接口，不依赖已退役的旧 OA Web Service。
 
 最新 E3.1 代码 97d7c3a6aaca1a88e73d514bacca9e33f03cb7bc：标准 CI 45589377280 8/8 通过，联网 45589377415 首次 attempt 中 NCBI PMC 实测 3 条成功入库，Europe PMC HTTP 503 失败。已请求仅重跑失败 job。此次仅更新文档，无功能代码变化；核验文档提交标准 CI 与代码 SHA 的联网 run，全部通过才进入 E3.2，或由用户明确授权改变外部服务门槛。不得将 NCBI 成功等同 Europe PMC 恢复。
+
+E3.1 最新修复：标准 CI 45592551774 8/8 通过，双来源联网 45589377415 attempt 3 中 Europe PMC HTTP 503，NCBI PMC 成功。按官方 REST 文档修复 sort=P_PDATE_D desc，FIRST_PDATE 范围筛选保留，新增请求契约测试（累计 74 个）。根因未确认，需核验最新代码 SHA 对应标准 CI 和双来源真实联网全部成功才进入 E3.2。

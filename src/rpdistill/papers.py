@@ -268,7 +268,7 @@ def discover(query, catalog, *, fetch=fetch_page, sleep=time.sleep):
     while stats["inspected"] < query.limit and stats["pages"] < 20:
         params = dict(query=query.expression(), format="json", resultType="core",
                       pageSize=min(50, query.limit-stats["inspected"]), cursorMark=cursor,
-                      sort="FIRST_PDATE desc")
+                      sort="P_PDATE_D desc")
         payload = fetch(params)
         stats["pages"] += 1
         rows = payload.get("resultList", {}).get("result")
