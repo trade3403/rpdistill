@@ -5,7 +5,7 @@
 RPDistill 负责教师模型、语料、训练、评测和模型导出。RPTranslate 保持独立 Rust 推理，不依赖训练环境。
 
 ## 当前状态
-E1.1：Python 基础工程和 CPU 自动化测试。尚未接入真实教师模型或 GPU 训练，GUI 为后续阶段。
+E1.2：Python 基础工程、SQLite 实验记录、生命周期状态与日志、设备探测、CPU 自动化测试（新提交待 CI 验收）。尚未接入真实教师模型或 GPU 训练，GUI 为后续阶段。
 
 ## 快速开始
 ```sh
@@ -36,3 +36,13 @@ python -m unittest discover -s tests -v
 
 ![RPDistill Studio 全自动蒸馏控制中心](docs/assets/rpdistill-auto-distill-dashboard.png)
 
+
+### E1.2 本地基础功能
+```sh
+python -m rpdistill devices
+python -m rpdistill create --teacher Qwen-candidate --student RPTranslate
+python -m rpdistill list
+python -m rpdistill show <task-id>
+python -m rpdistill events <task-id>
+``
+默认数据库为 ~/.rpdistill/tasks.sqlite3；可在子命令前使用 --db 指定路径。创建实验仅保存配置并排队，不会下载模型或开始训练。NVIDIA 探测不等于 CUDA 训练验收。
