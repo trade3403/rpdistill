@@ -29,6 +29,7 @@ from .evaluation import freeze_benchmark, evaluate, read_json, read_jsonl, write
 from .student_evaluation import GenerationConfig, evaluate_checkpoint
 from .quality_review import leakage_audit, create_blind_review, collect_review, ReviewGate
 from .compression import plan as compression_plan, create_candidate
+from .compression_review import RegressionGate, compare_candidates
 
 
 def runtime_info() -> dict[str, str]:
@@ -38,7 +39,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E8a",
+        "stage": "E8b",
     }
 
 
@@ -309,6 +310,17 @@ def parser() -> argparse.ArgumentParser:
     compress.add_argument("--mode",choices=["fp32","fp16","int8"],required=True)
     compress.add_argument("--output",required=True)
     compress.add_argument("--max-bytes",type=int,required=True)
+    compare=commands.add_parser("benchmark-compression")
+    compare.add_argument("--benchmark",required=True)
+    compare.add_argument("--checkpoint",required=True)
+    compare.add_argument("--assets",required=True)
+    compare.add_argument("--candidate",action="append",required=True)
+    compare.add_argument("--gate",help="Optional JSON RegressionGate")
+    compare.add_argument("--max-new-tokens",type=int,default=128)
+    compare.add_argument("--max-logits",type=int,default=16777216)
+    compare.add_argument("--max-cases",type=int,default=1000)
+    compare.add_argument("--max-seconds",type=float,default=3600)
+    compare.add_argument("--output",required=True)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -322,6 +334,16 @@ def main(argv=None) -> int:
             result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
             path=write_new(args.output,result)
             result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "benchmark-compression":
+            if Path(args.output).exists() or Path(args.output).is_symlink():
+                raise ValueError("output must be a new file")
+            result=compare_candidates(args.db,read_json(args.benchmark),args.checkpoint,args.assets,args.candidate,
+                config=GenerationConfig(args.max_new_tokens,args.max_logits),
+                gate=RegressionGate(**read_json(args.gate)) if args.gate else RegressionGate(),
+                max_cases=args.max_cases,max_seconds=args.max_seconds)
+            path=write_new(args.output,result)
+            result={k:v for k,v in result.items() if k not in ("source","candidates","lexical_audit")}|{
+                "path":path,"candidates":[{k:v for k,v in row.items() if k!="score"} for row in result["candidates"]]}
         elif args.command == "student-compression-plan":
             result=compression_plan(args.mode)
         elif args.command == "student-compress":

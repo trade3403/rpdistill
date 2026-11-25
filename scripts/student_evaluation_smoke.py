@@ -11,6 +11,7 @@ from rpdistill.evaluation import freeze_benchmark,QualityGate,evaluate
 from rpdistill.quality_review import leakage_audit,create_blind_review,collect_review,ReviewGate
 from rpdistill.student import StudentProfile,StudentCodec,build_student,canonical_state
 from rpdistill.compression import create_candidate,load_candidate,plan,pack_tensor,unpack_tensor
+from rpdistill.compression_review import compare_candidates,verify_derivation
 from rpdistill.distill import DistillConfig,train_sequence,save_checkpoint
 from rpdistill.resumable import ResumeConfig,run_segment
 from rpdistill.student_evaluation import GenerationConfig,evaluate_checkpoint,load_evaluation_model,generate_one
@@ -97,6 +98,36 @@ with tempfile.TemporaryDirectory() as tmp:
             "file_bytes":manifest["weights"]["bytes"],"max_abs_error":maximum,
             "rmse":manifest["rmse"],"synthetic_translation_unchanged":True})
     assert compression[2]["payload_bytes"]<compression[1]["payload_bytes"]<compression[0]["payload_bytes"]
+    # All comparison candidates must derive from the SAME original checkpoint.
+    create_candidate(root/"weights",root/"int8-same",dataset_version=version,mode="int8",
+                     max_bytes=16*1024*1024,profile=p)
+    comparison=compare_candidates(root/"db",benchmark,root/"weights",None,
+        [root/"fp32",root/"fp16",root/"int8-same"],profile=p,codec=codec,
+        config=GenerationConfig(max_new_tokens=8))
+    assert comparison["selected"] is None and not comparison["release_ready"]
+    assert all(r["source_conversion_verified"] and r["regression"]["changed_fraction"]==0
+               and "candidate_absolute_quality" in r["regression"]["failures"]
+               for r in comparison["candidates"])
+    try:
+        compare_candidates(root/"db",benchmark,root/"weights",None,[root/"int8"],
+                           profile=p,codec=codec,config=GenerationConfig(max_new_tokens=8))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("different checkpoint candidate accepted")
+    modified,_=load_candidate(root/"fp32",dataset_version=version,
+                            source_checkpoint_id=source_manifest["checkpoint_id"],profile=p)
+    with torch.no_grad():
+        modified.model.shared.weight[2,0]+=1
+    try:
+        verify_derivation(reference,modified,"fp32",p)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("altered source conversion accepted")
+    print(json.dumps({"same_source_comparison":True,"evaluated_candidates":3,
+        "all_synthetic_outputs_unchanged":True,"insufficient_coverage_no_selection":True,
+        "wrong_checkpoint_rejected":True,"altered_conversion_rejected":True,"release_ready":False}))
     q,scale=pack_tensor(torch.zeros((2,4),dtype=torch.float32),"int8")
     assert torch.equal(unpack_tensor(q,"int8",scale),torch.zeros((2,4)))
     try:

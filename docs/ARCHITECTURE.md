@@ -66,3 +66,5 @@ E7b1 student_evaluation.py：冻结 benchmark → 绑定训练 dataset 的已完
 E7b2 quality_review.py：冻结 benchmark + 训练快照 → 有界 trigram 倒排审计；两个同 benchmark 报告的内容 hash 与指标重算 → 随机匿名 A/B packet、独立私有映射 → 声明独立评审完整双侧评分 → 默认自动质量/生成状态/词面泄漏与人工候选 gate。身份和来源未认证，release_ready=false；Linux/macOS RSS 为进程生命周期峰值，非模型独占内存。COMET 及真实正式质量仍待本机。
 
 E8a compression.py：已完成训练 checkpoint → canonical FP32 权重 → FP32/矩阵 FP16/rowwise symmetric INT8+FP32 scale（位置/偏置/norm 保留 FP32）→ SafeTensors 压缩候选与内容哈希、误差、源 identity、预算 → 严格 FP32 参考还原。D 线最新 5389f3f 仅官方 F32，候选非 RPModel、无原生低精度推理；E8b 质量回归，E9 自训练包。
+
+E8b compression_review.py：原训练 checkpoint + 冻结 benchmark + 压缩候选 → 严格读取与重算源转换 → 相同 CPU FP32 greedy/指标 → 固定绝对门槛、相对回归、新增逐条规则错误及词面泄漏审计 → 按实际 artifact bytes 最小合格候选，失败则 null；有界 case/软时间预算、报告内容 hash，release_ready=false。
