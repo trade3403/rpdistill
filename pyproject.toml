@@ -13,6 +13,7 @@ dependencies = []
 hub = ["huggingface_hub>=0.31,<2"]
 modelscope = ["modelscope-hub>=0.7,<1"]
 inference = ["torch>=2.6,<3", "transformers>=4.51,<5", "safetensors>=0.4,<1"]
+student = ["torch>=2.6,<3", "transformers>=4.51,<5", "safetensors>=0.4,<1", "sentencepiece>=0.2,<1"]
 
 [project.scripts]
 rpdistill = "rpdistill.__main__:main"

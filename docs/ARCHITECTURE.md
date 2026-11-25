@@ -46,3 +46,5 @@ E3.2：NCBI PMC 默认，Europe PMC 暂缓。FulltextLibrary 消费 PaperCatalog
 E3.3a CorpusStore：输入已登记 PMC XML 和 PaperCatalog，检查当前资格、哈希、许可、日期；仅提取保守正文/摘要文本段，排除复杂结构和明确限制标记。每段存来源、署名、许可、论文级固定划分及哈希；教师版本/选项/提示与质量策略共同生成候选译文幂等键。数字和长度等基础筛查仅为候选筛选，候选 JSONL 不作为训练认证。后续 E3.3b 增加更完整的权利、语义、语言和数据集版本/冻结/自动调度能力。
 
 E3.3b DatasetStore 保存不可覆盖的内容寻址候选快照与成员，按固定教师配置筛选、重新哈希当前全文、精确源文本跨版本 split 防护，计数门槛不足不生成版本；导出校验哈希且不覆盖。CorpusPipeline 单次循环串联检索到候选快照，持久阶段，单 worker，解析/翻译/快照恢复；采集失败不自动重放预算。现有共享目录候选不严格按本次查询隔离，持续运行、增量分页、语义质量与训练授权留后续。
+
+E4a：student.py 固定 D 线 Marian 6+6/512/8/2048/65001 契约，PyTorch 训练侧随机初始化、canonical 权重验证、固定 SPM/词表文件校验及共享 network ID 映射；测试小 profile 不作为部署模型。真实 Rust loader 当前固定官方来源及哈希，E9 需自训练 package profile；见 STUDENT_CONTRACT.md。

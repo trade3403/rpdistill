@@ -20,6 +20,7 @@ from .fulltext import FulltextLibrary
 from .corpus import CorpusStore
 from .datasets import DatasetStore, DatasetGate
 from .pipeline import CorpusPipeline
+from .student import contract as student_contract, checked_assets
 
 
 def runtime_info() -> dict[str, str]:
@@ -29,7 +30,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E3.3b",
+        "stage": "E4a",
     }
 
 
@@ -162,6 +163,8 @@ def parser() -> argparse.ArgumentParser:
         cmd.add_argument("id")
         if action=="resume":
             cmd.add_argument("--worker-stopped",action="store_true")
+    student = commands.add_parser("student-info")
+    student.add_argument("--assets",help="Verify pinned local configuration and tokenizer assets")
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -171,6 +174,10 @@ def main(argv=None) -> int:
     try:
         if args.command in (None, "info"):
             result = runtime_info()
+        elif args.command == "student-info":
+            result=student_contract()
+            if args.assets:
+                result["verified_assets"]=str(checked_assets(args.assets))
         elif args.command == "devices":
             result = device_report(args.path)
         elif args.command == "paper-search":

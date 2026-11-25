@@ -102,3 +102,6 @@ E3.2 修复版标准 CI 8/8、NCBI 联网 2/2 通过，真实下载 10 篇 CC BY
 ### E3.3b 候选数据集快照与单次流水线
 E3.3a 标准 CI 8/8 与 NCBI 真实联网 2/2 通过，实际下载 10 篇并提取 337 段候选原文。新增 `dataset-create MODEL_ID --revision FULL_SHA`（固定教师、选项与最低 train/validation/test 数量）、`dataset-list`、`dataset-export VERSION --output dataset.jsonl`。内容寻址不可覆盖快照，保留成员和哈希，持久化精确源文本 split 约束防止跨版本精确重复泄漏；不是语义近重复检测或正式冻结评测集。快照仅为历史候选，training_ready=false，后续训练前仍须复核当前权利与质量。
 `pipeline-create MODEL_ID --revision FULL_SHA --keyword malaria --start-date 2024-01-01 --end-date 2024-12-31 --max-bytes 8388608` 返回任务 ID；`pipeline-run ID` 一次串联 NCBI 搜索→项目目录内已有/新增候选下载→解析→教师批量翻译→候选快照；`pipeline-show ID` 查看持久阶段；`pipeline-resume ID` 后接 `pipeline-run ID` 从解析/翻译/快照失败处恢复。采集阶段失败需创建新授权预算周期，避免重复消耗未记账流量；崩溃恢复需确认 worker 停止。当前共享目录的单次循环与有限任务预算，不是持续定时任务，不保证严格只处理当次检索记录；完整增量分页、跨来源、正式训练门槛、语义与许可验收待后续。真实教师质量在本机验收，CPU CI 为合成样例/模拟教师加已有真实微型模型推理。
+
+### E4a 学生模型契约
+E3.3b 标准 CI 8/8 已通过；E4a 依据 D 线固定提交审计 Marian 6+6 层、512 hidden、8 heads、FFN 2048、65001 词表，建立 PyTorch 学生架构与 canonical 权重验证。`python -m rpdistill student-info` 查看契约，`--assets PATH` 验证已在本地准备的固定 tokenizer/config 文件；`pip install -e '.[student]'` 安装学生依赖。学生是随机初始化，尚未训练、未通过真实 tokenizer/Rust 对照。当前 D 线仅接受固定官方审计包，新学生不能冒充原始模型；详见 [STUDENT_CONTRACT](docs/STUDENT_CONTRACT.md)。新 CI 待验收。

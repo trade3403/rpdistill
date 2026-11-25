@@ -36,7 +36,8 @@ CI 目标：5 个测试方法 × 6 个环境 = 30 次测试方法执行；对应
 | E3.1 | NCBI PMC / Europe PMC 检索、许可预筛、去重 | 并发修复后双来源联网及标准 CI 通过；Europe PMC 按用户要求暂缓 |
 | E3.2 | 全文 XML 下载与许可复核 | 10/10 必需 CI 通过（10 篇实测） |
 | E3.3a | JATS 解析、候选双语语料 | 10/10 必需 CI 通过（337 段实测） |
-| E3.3b | 数据集候选版本与单次自动采集翻译调度 | 已提交，待 CI |
+| E3.3b | 数据集候选版本与单次自动采集翻译调度 | 标准 CI 8/8 通过 |
+| E4a | D 线审计、Marian 学生架构及权重契约 | 已提交，待 CI |
 | E3 后续 | 全文许可复核、下载、解析及语料生成 | 待开发 |
 | E4 | 学生模型及 D 线适配 | 待开发 |
 | E5 | 知识蒸馏算法 | 待开发 |
@@ -128,3 +129,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E3.3a 验收与 E3.3b
 提交 6387e7abae01a8a3824e1c72340b66d257b7c995：[标准 CI 45599371724](https://github.com/trade3403/rpdistill/actions/runs/45599371724) 8/8、[真实联网 45599371716](https://github.com/trade3403/rpdistill/actions/runs/45599371716) NCBI 2/2 success，Europe PMC 授权 skipped；真实 job 139153869385 下载 10 篇、解析 337 段、0 阻断，均为候选原文，非真实双语质量结果。E3.3b datasets.py 固定教师/配置、最低样本门槛、重新检查源文件哈希、精确源文本跨版本 split 防护、内容寻址快照、完整性导出；pipeline.py 单次 NCBI 搜索→下载→解析→翻译→候选快照，SQLite 持久化阶段、单 worker 原子抢占、解析及之后失败可恢复、采集失败新授权周期。新增 7 个测试方法；CI 待验收。候选快照 training_ready=false，不标正式训练许可；历史快照不能直接作为当前权利证据。持续调度、跨来源与完整增量分页、真正语言/语义/公式质量和近重复泄漏、冻结评测集待后续。E4 读取实际 RPTranslate Rust 规范及学生网络适配，不能先假设架构。
+
+## E3.3b 验收及 E4a
+提交 65619c3286ad047ab177d3e7ee66d0fac25afcd1：[CI 45601299054](https://github.com/trade3403/rpdistill/actions/runs/45601299054) 8/8 success；论文联网路径未变，上次 45599371716 NCBI 2/2 通过。E4a 只读审计 D 线 feature/rptranslate 固定 7f1fdb282bbdc947dc4a5d953768efaed429959d；新增 student.py、StudentProfile、canonical 形状/共享权重验证、固定资产哈希、保守分词 ID 映射、student-info、4 个单元测试、新增 real-cpu-student job：真实小 Marian 前向及完整尺寸随机初始化。256 canonical tensors、312033188 FP32 payload bytes，非实测总内存。D loader 仍固定官方来源/哈希，rust_deployable=false；不伪造包。E4b 真实 tokenizer 资产对照与训练 batch/labels/mask，E5 真实参数更新；E9 自训练包 Rust 验收。详情 docs/STUDENT_CONTRACT.md。新 CI 待验收。
