@@ -71,3 +71,5 @@ E6b2 标准 CI 9/9 success（真实 CPU 队列、3 checkpoints、176 states 一�
 E7a 13/13 CI success；E7b1 真实学生检查点评测、CPU greedy、双检查点格式、同 benchmark baseline delta 与延迟/吞吐记录已提交待 CI。正式人工评测、近重复/真实基线及内存实测待 E7b2；未宣称真实科研翻译质量或可发布。
 
 E7b1 标准 CI 10/10 success；E7b2 有界近重复审计、匿名 A/B 盲测流程、完整双评审候选门槛和 Linux/macOS peak RSS 已提交待 CI；真实人工评审、基线来源认证、语义独立性、COMET 与真实 GPU/质量仍待实际验收。
+
+E7b2 CI 10/10 success（合成盲评）。E8a FP32/FP16/INT8 存储候选、误差/体积/哈希与 FP32 参考还原已提交待 CI；非原生 INT8 推理，正式量化质量回归 E8b、Rust 自训练包 E9。

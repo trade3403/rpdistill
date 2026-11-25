@@ -64,3 +64,5 @@ E7a evaluation.py：训练快照全量哈希→规范化精确源文与声明 DO
 E7b1 student_evaluation.py：冻结 benchmark → 绑定训练 dataset 的已完成 checkpoint（E5 weights/E6 full-state，哈希/shape 严格验证，仅模型权重）→ CPU FP32 greedy generation（源文本，不输入 reference）→ 网络词表解码/完成状态 → SacreBLEU 与科研规则 → 可选外部基线同 benchmark delta、实际延迟与吞吐、报告 SHA；无 KV cache，权重字节非 RSS，未签名外部输出，release_ready=false。真实独立质量/性能待 E7b2/本机。
 
 E7b2 quality_review.py：冻结 benchmark + 训练快照 → 有界 trigram 倒排审计；两个同 benchmark 报告的内容 hash 与指标重算 → 随机匿名 A/B packet、独立私有映射 → 声明独立评审完整双侧评分 → 默认自动质量/生成状态/词面泄漏与人工候选 gate。身份和来源未认证，release_ready=false；Linux/macOS RSS 为进程生命周期峰值，非模型独占内存。COMET 及真实正式质量仍待本机。
+
+E8a compression.py：已完成训练 checkpoint → canonical FP32 权重 → FP32/矩阵 FP16/rowwise symmetric INT8+FP32 scale（位置/偏置/norm 保留 FP32）→ SafeTensors 压缩候选与内容哈希、误差、源 identity、预算 → 严格 FP32 参考还原。D 线最新 5389f3f 仅官方 F32，候选非 RPModel、无原生低精度推理；E8b 质量回归，E9 自训练包。

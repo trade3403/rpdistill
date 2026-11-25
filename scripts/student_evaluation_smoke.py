@@ -9,10 +9,11 @@ import torch
 from rpdistill.datasets import DatasetStore,encoded,sha
 from rpdistill.evaluation import freeze_benchmark,QualityGate,evaluate
 from rpdistill.quality_review import leakage_audit,create_blind_review,collect_review,ReviewGate
-from rpdistill.student import StudentProfile,StudentCodec,build_student
+from rpdistill.student import StudentProfile,StudentCodec,build_student,canonical_state
+from rpdistill.compression import create_candidate,load_candidate,plan,pack_tensor,unpack_tensor
 from rpdistill.distill import DistillConfig,train_sequence,save_checkpoint
 from rpdistill.resumable import ResumeConfig,run_segment
-from rpdistill.student_evaluation import GenerationConfig,evaluate_checkpoint,load_evaluation_model
+from rpdistill.student_evaluation import GenerationConfig,evaluate_checkpoint,load_evaluation_model,generate_one
 
 torch.set_num_threads(1)
 p=StudentProfile(vocab=8,hidden=16,heads=2,ffn=32,encoder_layers=1,decoder_layers=1,positions=16,pad=7)
@@ -69,6 +70,58 @@ with tempfile.TemporaryDirectory() as tmp:
         "synthetic_reviewer_count":2,"insufficient_automatic_coverage_rejected":True,
         "process_peak_rss_bytes":reports[0]["performance"]["process_peak_rss_bytes"],
         "real_human_review":False}))
+    # Real conversion, strict reconstruction and greedy translation regression.
+    compression=[]
+    source,source_manifest=load_evaluation_model(root/"weights",expected_dataset=version,profile=p)
+    reference=canonical_state(source,p)
+    for mode in ("fp32","fp16","int8"):
+        path=root/mode
+        original_path=root/("full" if mode=="int8" else "weights")
+        source_model,source_record=load_evaluation_model(original_path,expected_dataset=version,profile=p)
+        candidate=create_candidate(original_path,path,dataset_version=version,mode=mode,
+                                   max_bytes=16*1024*1024,profile=p)
+        restored,manifest=load_candidate(path,dataset_version=version,
+            source_checkpoint_id=source_record["checkpoint_id"],profile=p)
+        original=canonical_state(source_model,p)
+        reconstructed=canonical_state(restored,p)
+        maximum=max(float((original[k]-reconstructed[k]).abs().max()) for k in original)
+        assert abs(maximum-candidate["max_abs_error"])<1e-7
+        if mode=="fp32":
+            assert all(torch.equal(original[k],reconstructed[k]) for k in original)
+        else:
+            assert maximum>0 and maximum<0.05
+        item=generate_one(restored,codec,benchmark["cases"][0]["source"],GenerationConfig(max_new_tokens=8))
+        assert item["finish_reason"]=="eos" and item["hypothesis"]=="科研翻译。",item
+        assert not manifest["plan"]["rust_deployable"] and not manifest["release_ready"]
+        compression.append({"mode":mode,"payload_bytes":manifest["plan"]["payload_bytes"],
+            "file_bytes":manifest["weights"]["bytes"],"max_abs_error":maximum,
+            "rmse":manifest["rmse"],"synthetic_translation_unchanged":True})
+    assert compression[2]["payload_bytes"]<compression[1]["payload_bytes"]<compression[0]["payload_bytes"]
+    q,scale=pack_tensor(torch.zeros((2,4),dtype=torch.float32),"int8")
+    assert torch.equal(unpack_tensor(q,"int8",scale),torch.zeros((2,4)))
+    try:
+        unpack_tensor(q,"int8",torch.zeros(2))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid INT8 scale accepted")
+    try:
+        load_candidate(root/"int8",dataset_version=version,source_checkpoint_id="0"*64,profile=p)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("wrong source identity accepted")
+    with (root/"int8"/"weights.safetensors").open("ab") as out:
+        out.write(b"x")
+    try:
+        load_candidate(root/"int8",dataset_version=version,source_checkpoint_id=source_record["checkpoint_id"],profile=p)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("corrupt compressed candidate accepted")
+    print(json.dumps({"compression":compression,"production_payload_plans":[plan(m) for m in ("fp32","fp16","int8")],
+        "wrong_source_rejected":True,"corruption_rejected":True,"native_int8_inference":False,
+        "model_quality_test":False}))
     try:
         load_evaluation_model(root/"full",profile=p,expected_dataset="0"*64)
     except ValueError:

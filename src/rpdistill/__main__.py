@@ -28,6 +28,7 @@ from .training_queue import TrainingQueue
 from .evaluation import freeze_benchmark, evaluate, read_json, read_jsonl, write_new, QualityGate
 from .student_evaluation import GenerationConfig, evaluate_checkpoint
 from .quality_review import leakage_audit, create_blind_review, collect_review, ReviewGate
+from .compression import plan as compression_plan, create_candidate
 
 
 def runtime_info() -> dict[str, str]:
@@ -37,7 +38,7 @@ def runtime_info() -> dict[str, str]:
         "python": platform.python_version(),
         "platform": platform.system(),
         "architecture": platform.machine(),
-        "stage": "E7b2",
+        "stage": "E8a",
     }
 
 
@@ -300,6 +301,14 @@ def parser() -> argparse.ArgumentParser:
     review.add_argument("--reviews",required=True,help="JSON list of independent reviewer records")
     review.add_argument("--gate",help="Optional JSON ReviewGate; engineering thresholds, not release approval")
     review.add_argument("--output",required=True)
+    compress_plan=commands.add_parser("student-compression-plan")
+    compress_plan.add_argument("--mode",choices=["fp32","fp16","int8"],required=True)
+    compress=commands.add_parser("student-compress")
+    compress.add_argument("version")
+    compress.add_argument("--checkpoint",required=True)
+    compress.add_argument("--mode",choices=["fp32","fp16","int8"],required=True)
+    compress.add_argument("--output",required=True)
+    compress.add_argument("--max-bytes",type=int,required=True)
     # State transitions are internal API only until a real worker exists.
     return p
 
@@ -313,6 +322,12 @@ def main(argv=None) -> int:
             result=freeze_benchmark(args.db,args.version,read_jsonl(args.input),review_note=args.review_note)
             path=write_new(args.output,result)
             result={"benchmark_id":result["benchmark_id"],"cases":len(result["cases"]),"path":path}
+        elif args.command == "student-compression-plan":
+            result=compression_plan(args.mode)
+        elif args.command == "student-compress":
+            result=create_candidate(args.checkpoint,args.output,dataset_version=args.version,
+                mode=args.mode,max_bytes=args.max_bytes)
+            result={k:v for k,v in result.items() if k not in ("layout","tensor_errors")}
         elif args.command == "benchmark-leakage-audit":
             result=leakage_audit(args.db,read_json(args.benchmark))
             path=write_new(args.output,result)
