@@ -94,10 +94,10 @@ def retry_delay(error, attempt):
     return delay
 
 
-def fetch_page(params, *, opener=open_https, sleep=time.sleep, attempts=4):
+def fetch_page(params, *, opener=open_https, sleep=time.sleep, attempts=4, endpoint=ENDPOINT):
     if type(attempts) is not int or not 1 <= attempts <= 5:
         raise ValueError("attempts must be 1–5")
-    request = Request(ENDPOINT + "?" + urlencode(params),
+    request = Request(endpoint + "?" + urlencode(params),
                       headers={"Accept":"application/json", "User-Agent":"RPDistill/0.1"})
     for attempt in range(attempts):
         try:

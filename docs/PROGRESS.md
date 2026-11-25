@@ -101,3 +101,6 @@ F21 升级为核心必选要求：自动搜索论文、下载、翻译、清洗�
 
 ## E3.1 联网失败与修复
 提交 fadf2ab3e3307923e57451da0e601cfae6774d0b 对应 [标准 CI 45588253788](https://github.com/trade3403/rpdistill/actions/runs/45588253788) 8/8 success；[论文联网 smoke 45588253824](https://github.com/trade3403/rpdistill/actions/runs/45588253824) failure，真实日志 Europe PMC HTTP 503。新增有界瞬态重试（默认 4 次尝试、2/4/8 秒退避，遵守 Retry-After，超过 60 秒则终止以免过早请求；永久 HTTP 错误、TLS 错误不重试）。保持真实联网测试的成功断言，不吞掉失败或改用模拟结果。新增 5 个测试方法，累计 66 个；新修复待标准与联网 CI 复验。未进入 E3.2。
+
+## E3.1 重试验收与备用来源
+提交 e2cfef89cc08b6bca1636fcf6ad9258abbf07a97 对应 [标准 CI 45588726018](https://github.com/trade3403/rpdistill/actions/runs/45588726018) 8/8 通过；[论文联网 45588726112](https://github.com/trade3403/rpdistill/actions/runs/45588726112) 仍失败，日志显示 HTTP 503 重试耗尽。新增 ncbi_papers.py：NCBI PMC 官方 ESearch/ESummary、语言与日期、OA/CC BY/CC0 查询过滤、PMCID/DOI、目录去重、可选自动备用来源（仅首个请求暂时失败，无部分检索预算重置），报告原失败原因。新增 7 个单元测试，累计 73 个。保留 Europe PMC 独立真实测试，增加 NCBI PMC 独立联网 smoke，均须核验，不把备用成功当作 Europe PMC 恢复。NCBI 许可筛选不等于具体全文许可，待 E3.2 验证。未进入 E3.2。新提交待 CI。

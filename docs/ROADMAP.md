@@ -11,7 +11,7 @@
 | E2.2b1 | ModelScope 搜索、版本查询、固定 SHA 下载、来源隔离 |
 | E2.2b2 | SDK 安装、真实小配置与检索 smoke、HF 逐块字节进度和 Range 恢复；ModelScope 字节级控制后续完善 |
 | E2.3 | 本地已注册 SafeTensors 教师模型加载、科研批量翻译、真实微型 CPU 推理；Qwen 候选质量与 GPU 验收留本机/E7 |
-| E3.1 | Europe PMC 检索、元数据许可预筛、SQLite 目录与 DOI/PMCID 去重 |
+| E3.1 | Europe PMC / NCBI PMC 检索及首请求失败备用来源、元数据许可预筛、SQLite 目录与 DOI/PMCID 去重 |
 | E3.2 | 官方 OA 全文权利复核、合法 XML 下载、完整性和预算控制 |
 | E3.3 | 论文解析、分段、跨来源扩展与双语语料生成清洗 |
 | E2 总体 | 教师模型适配器；Qwen 候选；内置在线搜索与一键下载（Hugging Face / ModelScope）、下载队列、断点续传、缓存、校验、自动注册、许可证记录、本地/远程推理 |

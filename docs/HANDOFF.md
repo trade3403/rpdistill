@@ -46,3 +46,5 @@ E2.2b2 标准 CI 45586043352 与联网 smoke 45586043462 全部成功。E2.3 inf
 E2.3 CI 45586949170（8/8）及 45586948901（2/2）已通过。E3.1 papers.py 只处理检索元数据；CC BY/CC0+OA+PMCID 进入 pending_fulltext_license，不是训练授权，缺失或限制许可阻断。先检查标准 CI 和 Paper discovery live smoke，再 E3.2 从官方 OA 接口复核全文权利与合法下载，随后解析/多来源。实际千问 GPU 质量仍待用户本机。不要将已有历史待验收记录误作当前状态，以上最新记录优先。
 
 E3.1 标准 CI 45588253788 8/8 已通过；论文联网 45588253824 因 Europe PMC HTTP 503 失败。已提交有界重试及 Retry-After 处理，保持联网断言，必须核验新提交两套 CI 后再进入 E3.2。累计 66 个单元测试方法。
+
+E3.1 修复标准 CI 45588726018 8/8 成功，但真实 Europe PMC 45588726112 重试后仍 HTTP 503。新增 NCBI PMC 备用检索、CLI --provider auto/europe-pmc/ncbi-pmc 及独立联网 job，保留原 Europe PMC job。先核验本次标准 CI 与两个 provider 联网结果；若 Europe PMC 持续不可用，不将其标绿，需单独记录外部阻塞。累计 73 测试方法，未进入 E3.2。后续全文使用 PMC 当前 OAI-PMH / Cloud Service 等官方接口，不依赖已退役的旧 OA Web Service。

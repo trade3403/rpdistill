@@ -14,7 +14,8 @@ from dataclasses import asdict
 from .downloads import DownloadQueue
 from .modelscope_source import search_models, revisions, download_modelscope
 from .inference import TranslationOptions, load_teacher
-from .papers import PaperQuery, PaperCatalog, discover
+from .papers import PaperQuery, PaperCatalog
+from .ncbi_papers import discover_with_source
 
 
 def runtime_info() -> dict[str, str]:
@@ -96,6 +97,7 @@ def parser() -> argparse.ArgumentParser:
     papers.add_argument("--language", default="eng")
     papers.add_argument("--limit", type=int, default=100)
     papers.add_argument("--include-closed", action="store_true")
+    papers.add_argument("--provider", choices=["auto", "europe-pmc", "ncbi-pmc"], default="auto")
     listing = commands.add_parser("paper-list")
     listing.add_argument("--limit", type=int, default=100)
     # State transitions are internal API only until a real worker exists.
@@ -113,7 +115,7 @@ def main(argv=None) -> int:
             query = PaperQuery(tuple(args.keyword), args.start_date, args.end_date,
                                subject=args.subject, language=args.language or None,
                                limit=args.limit, open_access_only=not args.include_closed)
-            result = discover(query, PaperCatalog(args.db))
+            result = discover_with_source(query, PaperCatalog(args.db), source=args.provider)
         elif args.command == "paper-list":
             result = PaperCatalog(args.db).list(args.limit)
         elif args.command == "teacher-translate":
