@@ -169,10 +169,10 @@ function modelAction(request:unknown):Promise<ModelReply>{
 }
 let win:BrowserWindow|null=null;
 function create(){
-  win=new BrowserWindow({width:1672,height:941,minWidth:1000,minHeight:650,
+  win=new BrowserWindow({width:1672,height:941,useContentSize:true,minWidth:1000,minHeight:650,
     show:!smoke,backgroundColor:"#10141d",title:"RPDistill Studio",
     webPreferences:{preload:join(__dirname,"preload.cjs"),contextIsolation:true,nodeIntegration:false,
-      sandbox:true,webSecurity:true,additionalArguments:smoke?["--studio-smoke"]:[]}});
+      sandbox:true,webSecurity:true,offscreen:smoke,additionalArguments:smoke?["--studio-smoke"]:[]}});
   win.webContents.setWindowOpenHandler(()=>({action:"deny"}));
   win.webContents.on("will-navigate",(e,url)=>{if(url!==allowedURL)e.preventDefault()});
   win.webContents.on("will-attach-webview",e=>e.preventDefault());
@@ -180,6 +180,7 @@ function create(){
     if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running){event.preventDefault();dialog.showMessageBoxSync(win!,{type:"info",title:"执行器仍在运行",message:"请等待语料或学生资源任务完成，或先暂停/取消模型下载及训练任务，再关闭窗口。"});}
   });
   win.on("closed",()=>{win=null});
+  if(smoke)win.setContentSize(1672,941);
   void win.loadFile(page);
 }
 app.whenReady().then(()=>{
