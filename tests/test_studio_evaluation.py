@@ -25,7 +25,9 @@ class StudioEvaluationTests(unittest.TestCase):
             root=Path(tmp); db=root/"db"; q=TrainingQueue(db)
             j=q.enqueue("a"*64,root/"assets",root/"checkpoints",reviewed_dataset="a"*64,
                 reviewed_teacher_license="mit",total_seconds=300,total_checkpoint_bytes=2**30)
-            checkpoint=root/"checkpoints"/j["id"]/"attempt-00000001"
+            # Match the real queue: its spec stores a canonical absolute root.
+            # Temporary paths may use aliases (macOS /var, Windows junctions/short names).
+            checkpoint=Path(j["spec"]["root"])/j["id"]/"attempt-00000001"
             checkpoint.mkdir(parents=True)
             m={"fixture":True}; m["checkpoint_id"]=hash_json(m)
             (checkpoint/"manifest.json").write_text(json.dumps(m),encoding="utf-8")
@@ -38,6 +40,15 @@ class StudioEvaluationTests(unittest.TestCase):
                     "metrics":{"bleu":20.0,"chrf":42.0},"coverage":{"cases":1,"papers":1},
                     "automatic_gate_passed":False,"failures":["coverage:cases"],"performance":{}}
             report["report_id"]=hash_json(report)
+            # The containment check must still reject a checkpoint outside the registered root.
+            with q.write() as c:
+                c.execute("UPDATE training_jobs SET checkpoint=? WHERE id=?",
+                          (str(root/"outside"/"attempt-00000001"),j["id"]))
+            with self.assertRaisesRegex(ValueError,"checkpoint outside registered job root"):
+                evaluate_job(db,j["id"],inp,root/"eval","fixture",approved=True)
+            self.assertFalse((root/"eval").exists())
+            with q.write() as c:
+                c.execute("UPDATE training_jobs SET checkpoint=? WHERE id=?",(str(checkpoint),j["id"]))
             with patch("rpdistill.studio_evaluation.freeze_benchmark",return_value=benchmark):
                 result=evaluate_job(db,j["id"],inp,root/"eval","fixture",approved=True,evaluate_fn=lambda *a,**kw:report)
             self.assertFalse(result["release_ready"])

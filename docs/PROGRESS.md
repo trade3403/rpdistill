@@ -250,3 +250,7 @@ E11c2 修复 fd79b35 标准 45741425689、Windows 专项 45741425763 success。�
 
 ## E11d1 本地质量评测中心（开发分支，待 CI）
 前置 c36b581 标准45745414468、专项45745414607均 success；Windows offscreen 1672×941、8区域完整，原稿RGB平均绝对差27.3101，非1:1，右栏仍需滚动。新增完成训练登记检查点+人工审核JSONL原生文件选择+明确授权；本地 CPU FP32 评测最多200条/128新token，复用冻结评测、训练重叠拒绝、完整检查点核验及默认质量门槛，不降低覆盖要求。持久SQLite评测记录、冻结集/完整报告本地独立目录、只读摘要与BLEU/chrF/数字/术语等，报告身份校验、显式异常恢复，不自动发布；本地执行器互斥，评测无协作暂停，其他独立CLI进程不受全局锁保护。新增后端持久记录测试（注入测试报告，非真实评分）及Windows IPC拒绝未授权/路径注入；真实模型评测已有CPU微型专项，完整GUI人工真实评测尚未执行。E11d2量化候选及导出验证待本提交CI通过。Windows-only GUI，Europe PMC暂缓，D线只读。
+
+
+## E11d1 跨平台评测测试路径修复（待 CI）
+ca1760b 标准 CI 45746734363 为6/10 success，四个 macOS/Windows Python 3.11/3.12 CPU矩阵全部在 test_persist_report_and_recovery 触发 checkpoint outside registered job root；已核查四份日志。训练队列登记 spec.root 时使用 Path.resolve()，实际 worker 从该规范路径构造 checkpoint；测试却直接从 TemporaryDirectory 原始路径构造，跨平台临时目录别名导致字面不等。修正测试从真实登记 spec.root 构造 checkpoint，保留生产路径安全检查和所有原断言，补充越界路径必须拒绝且不创建评测目录的回归；Windows 专项路径过滤加入新增测试，重新验收。原专项 45746734341 success；新提交 exact head 标准和专项全部通过后进入 E11d2，真实人工评测/GPU/像素级验收仍未完成。Windows GUI only，Europe PMC 暂缓，D线只读。
