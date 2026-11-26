@@ -51,8 +51,11 @@ def score_model(db_path,benchmark,model,codec,config,deadline,label):
         outputs.append({"id":case["id"],"hypothesis":item["hypothesis"]})
         generation.append({"id":case["id"],**{k:v for k,v in item.items() if k!="hypothesis"}})
     report=evaluate(db_path,benchmark,outputs,gate=QualityGate(),label=label)
-    elapsed=sum(r["latency_seconds"] for r in generation)
+    times=sorted(r["latency_seconds"] for r in generation)
+    elapsed=sum(times)
     return {"evaluation":report,"generation":generation,
+            "median_case_seconds":(times[(len(times)-1)//2]+times[len(times)//2])/2,
+            "p95_case_seconds":times[math.ceil(len(times)*0.95)-1],
             "generation_complete":all(r["finish_reason"]=="eos" for r in generation),
             "total_generation_seconds":elapsed,
             "generated_tokens_per_second":sum(r["generated_tokens"] for r in generation)/elapsed if elapsed else None}
@@ -171,6 +174,7 @@ def compare_candidates(db_path,benchmark,checkpoint,assets,candidates,*,config=G
             "generation_config":asdict(config),"regression_gate":asdict(gate),
             "absolute_gate":asdict(QualityGate()),"lexical_audit":audit,
             "source":source_score,"candidates":rows,
+            "performance_scope":"same-run CPU FP32 single-case greedy generation; sequential order, no isolated memory or native low precision speed claim",
             "selected":choose(rows,audit_passed=audit["passed"]),
             "elapsed_seconds":time.monotonic()-start,"process_peak_rss_bytes":peak_process_rss(),
             "compute_dtype":"float32","native_low_precision_inference":False,

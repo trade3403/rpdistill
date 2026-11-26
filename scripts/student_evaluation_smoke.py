@@ -128,6 +128,10 @@ with tempfile.TemporaryDirectory() as tmp:
         [root/"fp32",root/"fp16",root/"int8-same"],profile=p,codec=codec,
         config=GenerationConfig(max_new_tokens=8))
     assert comparison["selected"] is None and not comparison["release_ready"]
+    for measured in [comparison["source"]]+[r["score"] for r in comparison["candidates"]]:
+        assert measured["total_generation_seconds"]>0 and measured["generated_tokens_per_second"]>0
+        assert 0<measured["median_case_seconds"]<=measured["p95_case_seconds"]
+    assert comparison["compute_dtype"]=="float32" and comparison["native_low_precision_inference"] is False
     assert all(r["source_conversion_verified"] and r["regression"]["changed_fraction"]==0
                and "candidate_absolute_quality" in r["regression"]["failures"]
                for r in comparison["candidates"])

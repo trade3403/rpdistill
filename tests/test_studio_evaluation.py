@@ -38,7 +38,12 @@ class StudioEvaluationTests(unittest.TestCase):
             benchmark={"benchmark_id":"b"*64}
             report={"checkpoint_id":m["checkpoint_id"],"benchmark_id":"b"*64,"release_ready":False,
                     "metrics":{"bleu":20.0,"chrf":42.0},"coverage":{"cases":1,"papers":1},
-                    "automatic_gate_passed":False,"failures":["coverage:cases"],"performance":{}}
+                    "automatic_gate_passed":False,"failures":["coverage:cases"],"generation_failures":["a"],
+                    "gate":{"min_cases":100,"min_bleu":20.0},
+                    "performance":{"device":"cpu","dtype":"float32","threads":4,"checkpoint_load_seconds":1.5,
+                                   "total_generation_seconds":2.0,"median_case_seconds":2.0,
+                                   "p95_case_seconds":2.0,"generated_tokens_per_second":3.5,
+                                   "canonical_weight_bytes":100,"process_peak_rss_bytes":200}}
             report["report_id"]=hash_json(report)
             # The containment check must still reject a checkpoint outside the registered root.
             with q.write() as c:
@@ -52,7 +57,14 @@ class StudioEvaluationTests(unittest.TestCase):
             with patch("rpdistill.studio_evaluation.freeze_benchmark",return_value=benchmark):
                 result=evaluate_job(db,j["id"],inp,root/"eval","fixture",approved=True,evaluate_fn=lambda *a,**kw:report)
             self.assertFalse(result["release_ready"])
-            self.assertEqual(snapshot(db)["rows"]["evaluations"][0]["chrf"],42.0)
+            row=snapshot(db)["rows"]["evaluations"][0]
+            self.assertEqual(row["chrf"],42.0)
+            self.assertEqual(row["generation_failure_count"],1)
+            self.assertEqual(row["min_cases"],100)
+            self.assertEqual(row["tokens_per_second"],3.5)
+            self.assertEqual(row["peak_rss_bytes"],200)
+            self.assertIsNone(row["min_protected"])
+            self.assertIsNone(row["citation_cases"])
             self.assertTrue((root/"eval"/result["id"]/"report.json").is_file())
             with closing(connect(db)) as c,c:
                 c.execute("UPDATE studio_evaluations SET state='running' WHERE id=?",(result["id"],))

@@ -68,6 +68,12 @@ def evaluate_job(db_path,training_id,input_path,root,review_note,*,approved=Fals
             raise ValueError("evaluation report identity mismatch")
         write_new(dest/"report.json",report)
         summary={k:report[k] for k in ("report_id","benchmark_id","metrics","coverage","automatic_gate_passed","failures","performance")}
+        # Keep only aggregate metrics in the bounded dashboard snapshot. Full
+        # hypotheses, references and detailed failures remain in the local report.
+        if "generation_failures" in report:
+            summary["generation_failure_count"]=len(report["generation_failures"])
+        if "gate" in report:
+            summary["gate"]=report["gate"]
         with closing(connect(db_path)) as db,db:
             changed=db.execute("UPDATE studio_evaluations SET state='complete',summary=?,updated=? WHERE id=? AND state='running'",
                 (json.dumps(summary,allow_nan=False),now(),id)).rowcount

@@ -104,10 +104,20 @@ def run_artifact(db_path,eval_id,mode,eval_root,root,*,max_bytes,max_seconds=360
                 raise ValueError("candidate conversion identity mismatch")
             write_new(folder/"comparison.json",comparison)
             selected=comparison["selected"]
+            # Same-run source and candidate timing; do not compare unrelated
+            # evaluation runs or claim native low-precision inference.
+            timing_keys=("total_generation_seconds","generated_tokens_per_second","median_case_seconds","p95_case_seconds")
+            timings={"source":{k:comparison["source"].get(k) for k in timing_keys},
+                     "candidate":{k:row["score"].get(k) for k in timing_keys}}
             summary={"artifact_id":row["candidate_id"],"bytes":row["artifact_bytes"],"verified":True,
                 "regression_passed":bool(selected and selected["candidate_id"]==row["candidate_id"]),
                 "metric_delta":row["regression"]["metric_delta"],"failures":row["regression"]["failures"],
-                "review_id":comparison["review_id"],"release_ready":False}
+                "review_id":comparison["review_id"],"release_ready":False,
+                "performance":timings,"compute_dtype":comparison["compute_dtype"],
+                "native_low_precision_inference":comparison["native_low_precision_inference"],
+                "weights_bytes":row["weights_bytes"],"source_fp32_payload_bytes":plan("fp32")["payload_bytes"],
+                "changed_fraction":row["regression"]["changed_fraction"],
+                "new_case_error_count":len(row["regression"]["new_case_errors"])}
         with closing(connect(db_path)) as db,db:
             if db.execute("UPDATE studio_artifacts SET state='complete',summary=?,updated=? WHERE id=? AND state='running'",
                           (json.dumps(summary,allow_nan=False),now(),id)).rowcount!=1:

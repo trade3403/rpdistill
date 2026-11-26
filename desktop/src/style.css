@@ -61,3 +61,5 @@ h1{font-size:24px}.hero{padding:16px 18px;margin-bottom:12px;background:linear-g
 
 /* Keep native window controls clear on non-dashboard pages too. */
 .shell main>header{padding-right:145px;-webkit-app-region:drag}.shell main>header button{-webkit-app-region:no-drag}.shell aside .brand{-webkit-app-region:drag}
+
+.quality-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:8px;margin:6px 0}.quality-cell{min-width:0;background:#101a2b;border:1px solid #2d4058;border-radius:6px;padding:9px;display:grid;gap:5px}.quality-cell b{font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.quality-cell .quality-pass{color:#6cdaa7}.quality-cell .quality-fail{color:#ff9a92}.quality-comparison th,.quality-comparison td{white-space:normal;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
