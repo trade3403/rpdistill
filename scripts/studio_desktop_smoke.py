@@ -27,7 +27,7 @@ def main():
             "--reviewed-license", "apache-2.0", "--max-bytes", "1024",
             "--cache-dir", str(root / "cache")], env=env, check=True, timeout=30)
         result = subprocess.run(["node", str(cli), ".", "--studio-smoke"],
-            cwd=desktop, env=env, check=True, timeout=60, capture_output=True,
+            cwd=desktop, env=env, check=True, timeout=90, capture_output=True,
             text=True, encoding="utf-8", errors="replace")
         print(result.stdout, end="")
         print(result.stderr, end="", file=sys.stderr)

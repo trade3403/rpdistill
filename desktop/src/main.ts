@@ -3,7 +3,8 @@ import {spawn} from "node:child_process";
 import {join,resolve} from "node:path";
 import {homedir} from "node:os";
 import {pathToFileURL} from "node:url";
-import {SCHEMA,type Reply,type Snapshot} from "./protocol";
+import {SCHEMA,type Reply,type Snapshot,type ModelReply} from "./protocol";
+import {modelArgs} from "./model-actions";
 const smoke=process.argv.includes("--studio-smoke");
 const page=join(__dirname,"index.html");
 const allowedURL=pathToFileURL(page).href;
@@ -37,6 +38,29 @@ function query():Promise<Reply>{
   }).finally(()=>{pending=undefined});
   return pending;
 }
+let modelPending=false;
+function modelAction(request:unknown):Promise<ModelReply>{
+ let args:string[];
+ try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
+ if(modelPending)return Promise.resolve({ok:false,error:"已有模型操作正在执行"});
+ modelPending=true;
+ return new Promise<ModelReply>(done=>{
+  const child=spawn(python,["-m","rpdistill","--db",db,...args],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+  let size=0,settled=false;const chunks:Buffer[]=[];
+  const finish=(r:ModelReply)=>{if(!settled){settled=true;clearTimeout(timer);done(r)}};
+  const fail=(error:string)=>{child.kill();finish({ok:false,error})};
+  const timer=setTimeout(()=>fail("模型操作超时，请刷新队列核对实际状态"),45000);
+  child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size>1024*1024){fail("模型响应超出限制");return}chunks.push(chunk)});
+  child.stderr.resume();
+  child.on("error",()=>{finish({ok:false,error:"无法启动 Python 后端"})});
+  child.on("close",code=>{
+   modelPending=false;
+   if(settled)return;
+   if(code!==0){finish({ok:false,error:"操作失败，请检查网络、SDK、模型信息或任务状态"});return}
+   try{finish({ok:true,data:JSON.parse(Buffer.concat(chunks).toString("utf8"))})}catch{finish({ok:false,error:"后端模型响应无效"})}
+  });
+ });
+}
 let win:BrowserWindow|null=null;
 function create(){
   win=new BrowserWindow({width:1672,height:941,minWidth:1000,minHeight:650,
@@ -57,13 +81,18 @@ app.whenReady().then(()=>{
        event.senderFrame!==win.webContents.mainFrame)return {ok:false,error:"请求来源无效"} satisfies Reply;
     return query();
   });
+  ipcMain.handle("studio:model-action",(event,request:unknown)=>{
+    if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
+       event.senderFrame!==win.webContents.mainFrame)return {ok:false,error:"请求来源无效"} satisfies ModelReply;
+    return modelAction(request);
+  });
   if(smoke){
     ipcMain.handle("studio:smoke-result",(event,value:unknown)=>{
       if(win&&event.sender===win.webContents&&event.senderFrame?.url===allowedURL){
         console.log("studio_smoke="+String(value===true));app.exit(value===true?0:1);
       }
     });
-    setTimeout(()=>app.exit(1),30000).unref();
+    setTimeout(()=>app.exit(1),60000).unref();
   }
   create();
   app.on("activate",()=>{if(!win)create()});

@@ -8,5 +8,12 @@ export interface Snapshot {
   read_only:true;training_metrics_available:false;release_ready:false;
 }
 export type Reply = {ok:true;data:Snapshot}|{ok:false;error:string};
-export interface StudioAPI {snapshot:()=>Promise<Reply>}
+export type ModelSource="huggingface"|"modelscope";
+export type ModelRequest =
+ | {kind:"search";source:ModelSource;query:string}
+ | {kind:"revisions";model_id:string}
+ | {kind:"enqueue";source:ModelSource;model_id:string;revision:string;license:string;max_bytes:number;reviewed:boolean}
+ | {kind:"pause"|"resume"|"cancel";id:string};
+export type ModelReply={ok:true;data:unknown}|{ok:false;error:string};
+export interface StudioAPI {snapshot:()=>Promise<Reply>;modelAction:(request:ModelRequest)=>Promise<ModelReply>}
 declare global {interface Window {studio:StudioAPI}}

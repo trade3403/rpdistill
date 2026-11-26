@@ -19,3 +19,7 @@ Windows TypeScript/esbuild 构建及原生 Electron 启动 smoke；Python CLI �
 
 ## E11a 高保真布局第一轮（独立视觉分支）
 依据 docs/assets/README.md 对 1672×941 中文深色设计稿的文字规范，重构左导航、中间流水线/六项真实指标/Loss 空状态/GPU 显存快照/任务错误摘要、右侧任务配置和单次/持续控制；未接入的配置与启动按钮禁用。窗口默认 1672×941，较窄窗口响应式排列，保留安全 IPC、实际下载/训练记录及 Windows 原生 smoke，扩展 smoke 检查三栏结构和禁用控制。未读取原 PNG 像素、未获得实际运行截图，不能称 1:1 还原；需在真实 Windows 运行、以原 PNG 逐项对照，核对 DPI 与字号、色值、尺寸及滚动。实时 Loss/利用率/事件流和操作仍待 E11b/E11c 接入。此分支不推进主分支 CI 门槛。
+
+
+## E11b1 教师模型中心（开发分支，待 CI）
+前置验收：主分支 7011607 标准 45640523576、Windows 45640524130 success；视觉分支 ce5777f 标准 45641912839 attempt 2 success、专项 45641912992 两项 success；原始 PNG SHA-256 与 1672×941 尺寸已校验，已取得参考预览，尚未完成像素级运行截图对照。新增公开 HF/ModelScope 搜索、ModelScope 版本信息、固定 SHA、明确许可/预算确认、持久入队、暂停/恢复/取消。IPC 固定白名单，严格参数与字段检查，无 shell、固定 DB/默认缓存路径、45 秒超时、1 MiB stdout、单一短操作；后端仍执行公开性和完整性校验。Windows smoke 增加非法 ID、未授权入队拒绝、实际 SQLite fixture 暂停/恢复和新增入队检查（无下载）。GUI 尚不启动 download-run，须 CLI 执行；下一 E11b2 接入单 worker 生命周期、真实网络指标、下载调度及小模型端到端验收。ModelScope 版本信息需操作者选完整 SHA；联网搜索和真实下载均待验收。先通过本提交标准及 Windows 专项 CI，后再推进，不提前合并。Windows-only GUI，原 D 线只读，Europe PMC 暂缓。
