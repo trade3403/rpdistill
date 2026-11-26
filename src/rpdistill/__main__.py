@@ -20,6 +20,7 @@ from .fulltext import FulltextLibrary
 from .corpus import CorpusStore
 from .datasets import DatasetStore, DatasetGate
 from .pipeline import CorpusPipeline
+from .studio_plans import create as plan_create, tick as plan_tick, recover as plan_recover, cancel as plan_cancel
 from .student import contract as student_contract, checked_assets
 from .training_data import acquire_assets, batch_plan
 from .distill import DistillConfig, train_reviewed_snapshot
@@ -214,6 +215,16 @@ def parser() -> argparse.ArgumentParser:
     ds_export = commands.add_parser("dataset-export")
     ds_export.add_argument("version")
     ds_export.add_argument("--output",required=True)
+    plan=commands.add_parser("plan-create")
+    plan.add_argument("id")
+    plan.add_argument("--license",required=True)
+    for flag in ("interval-minutes","max-cycles","total-bytes"):
+        plan.add_argument("--"+flag,type=int,required=True)
+    plan.add_argument("--approved",action="store_true")
+    for name in ("tick","cancel","recover"):
+        cmd=commands.add_parser("plan-"+name)
+        cmd.add_argument("id")
+        cmd.add_argument("--worker-stopped" if name=="recover" else "--approved",action="store_true")
     for action in ("run","show","resume"):
         cmd = commands.add_parser("pipeline-"+action)
         cmd.add_argument("id")
@@ -620,6 +631,14 @@ def main(argv=None) -> int:
             result=DatasetStore(args.db).list()
         elif args.command=="dataset-export":
             result=DatasetStore(args.db).export(args.version,args.output)
+        elif args.command=="plan-create":
+            result=plan_create(args.db,args.id,args.license,args.interval_minutes,args.max_cycles,args.total_bytes,approved=args.approved)
+        elif args.command=="plan-tick":
+            result=plan_tick(args.db,args.id,approved=args.approved)
+        elif args.command=="plan-cancel":
+            result=plan_cancel(args.db,args.id,approved=args.approved)
+        elif args.command=="plan-recover":
+            result=plan_recover(args.db,args.id,worker_stopped=args.worker_stopped)
         elif args.command in ("pipeline-run","pipeline-show","pipeline-resume"):
             engine=CorpusPipeline(args.db)
             if args.command=="pipeline-run":

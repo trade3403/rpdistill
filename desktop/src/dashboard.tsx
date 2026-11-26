@@ -2,7 +2,7 @@ import React,{useState} from "react";
 import type {Snapshot,ModelRequest,Row} from "./protocol";
 import {LossChart} from "./training-center";
 export const navigation=["运行控制中心","论文采集中心","教师模型管理","训练数据管理","蒸馏训练任务","模型评测中心","模型导出与发布","任务计划与自动化","系统资源监控","设置与偏好"];
-export const views=[0,2,1,2,3,4,4,2,5,6];
+export const views=[0,2,1,2,3,4,4,7,5,6];
 const navPaths=[
 "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
 "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14m5 12 6 6",
@@ -24,7 +24,7 @@ const active=(r:Row)=>activeStates.includes(String(r.state));
 const fmtBytes=(v:unknown)=>typeof v==="number"?(v/1024**3).toFixed(1)+" GiB":"—";
 const labels:Record<string,string>={queued:"排队",running:"运行中",pause_requested:"暂停请求",cancel_requested:"停止请求",paused:"已暂停",cancelled:"已取消",failed:"失败",interrupted:"中断",complete:"训练完成",candidate_complete:"候选已生成",insufficient_candidates:"候选不足",succeeded:"下载完成",budget_exhausted:"预算耗尽"};
 export function TopBar({data,stale,refresh,busy}:{data:Snapshot|null;stale:boolean;refresh:()=>Promise<void>;busy:boolean}){
- const running=!!data&&(!!data.counts.pipeline_active||!!data.counts.training_active||!!data.counts.download_active||!!data.local_evaluation_worker?.running||!!data.counts.evaluation_active||!!data.local_environment_worker?.running||!!data.local_asset_worker?.running||!!data.local_worker?.running||!!data.local_training_worker?.running||!!data.local_corpus_worker?.running);
+ const running=!!data&&(!!data.counts.pipeline_active||!!data.counts.training_active||!!data.counts.download_active||!!data.local_evaluation_worker?.running||!!data.counts.evaluation_active||!!data.local_plan_worker?.running||!!data.counts.plan_active||!!data.local_environment_worker?.running||!!data.local_asset_worker?.running||!!data.local_worker?.running||!!data.local_training_worker?.running||!!data.local_corpus_worker?.running);
  return <header className="studio-top"><div className="studio-brand"><svg width="48" height="48" viewBox="0 0 48 48" aria-hidden="true"><rect x="1" y="1" width="46" height="46" rx="14" fill="#6236d6"/><path d="m24 8 17 9-17 9-17-9zm-17 16 17 9 17-9M7 31l17 9 17-9" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinejoin="round"/></svg><div><div className="studio-name">RPDistill Studio <span>V{data?.version??"0.1.0"}</span></div><div className="studio-subtitle">全自动科研翻译模型蒸馏工厂</div></div></div><div className="studio-workflow">{["自动采集论文","教师模型翻译","知识蒸馏训练","自动评测量化","导出 RPTranslate 模型"].map((t,i)=><span key={t}><Glyph i={[2,3,5,6,7][i]} size={27}/>{t}</span>)}</div><button className={"studio-status "+(stale?"bad":running?"running":"")} disabled={busy} onClick={()=>void refresh()} title="刷新真实后端状态">{stale?"● 连接异常":!data?"● 连接中":running?"● 任务运行中":"● 后端就绪"}</button></header>
 }
 export function SideNav({nav,onNavigate}:{nav:number;onNavigate:(n:number)=>void}){return <aside className="studio-nav" aria-label="功能导航">{navigation.map((s,i)=><button key={s} className={"studio-nav-item"+(nav===i?" selected":"")} onClick={()=>onNavigate(i)} aria-current={nav===i?"page":undefined}><span aria-hidden="true"><NavGlyph i={i}/></span>{s}</button>)}</aside>}
@@ -32,7 +32,7 @@ function PanelConfig({data,stale,refresh,onNavigate}:{data:Snapshot|null;stale:b
  const teachers=(["huggingface","modelscope"] as const).flatMap(source=>(data?.rows[source==="huggingface"?"teachers":"modelscope_teachers"]??[]).map(row=>({source,row,key:source+":"+row.model_id+":"+row.revision})));
  const [teacherKey,setTeacher]=useState(""),[keyword,setKeyword]=useState(""),[start,setStart]=useState(""),[end,setEnd]=useState(""),[limit,setLimit]=useState("20"),[budget,setBudget]=useState(""),[approved,setApproved]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
  const teacher=teachers.find(t=>t.key===teacherKey);
- const running=!!data&&(!!data.counts.pipeline_active||!!data.counts.training_active||!!data.counts.download_active||!!data.local_evaluation_worker?.running||!!data.counts.evaluation_active||!!data.local_environment_worker?.running||!!data.local_asset_worker?.running||!!data.local_worker?.running||!!data.local_training_worker?.running||!!data.local_corpus_worker?.running);
+ const running=!!data&&(!!data.counts.pipeline_active||!!data.counts.training_active||!!data.counts.download_active||!!data.local_evaluation_worker?.running||!!data.counts.evaluation_active||!!data.local_plan_worker?.running||!!data.counts.plan_active||!!data.local_environment_worker?.running||!!data.local_asset_worker?.running||!!data.local_worker?.running||!!data.local_training_worker?.running||!!data.local_corpus_worker?.running);
  const locked=busy||stale||!data||running;
  const bytes=Number(budget)*1024**2,number=Number(limit);
  const ready=!!teacher&&!!teacher.row.license&&keyword.trim().length>0&&!!start&&!!end&&start<=end&&Number.isInteger(number)&&number>=1&&number<=50&&Number.isSafeInteger(bytes)&&bytes>0&&bytes<=2**40&&approved;
@@ -76,7 +76,7 @@ function PanelConfig({data,stale,refresh,onNavigate}:{data:Snapshot|null;stale:b
  <div className="config-line"><span>最大 GPU 显存</span><button className="config-link" onClick={()=>onNavigate(4)}>在训练中心配置 ›</button></div>
  <div className="config-line"><span>检查点磁盘</span><button className="config-link" onClick={()=>onNavigate(4)}>{fmtBytes(data?.student_resources?.checkpoint_free_bytes)} 可用 ›</button></div>
  <h3>自动化策略</h3><div className="strategy-grid">{["自动增量采集新论文","质量达标后评测","达标后自动量化导出","失败自动重试与续传"].map(s=><label key={s}><input type="checkbox" disabled/>{s}</label>)}</div>
- <p className="config-hint">当前仅单次 NCBI PMC → 教师翻译 → 候选数据集（CPU FP32）。持续调度、自动训练及发布尚未接入；采集使用共享论文目录。</p>
+ <button className="config-link" onClick={()=>onNavigate(7)}>配置周期语料计划 ›</button><p className="config-hint">当前仅单次 NCBI PMC → 教师翻译 → 候选数据集（CPU FP32）。周期语料计划请在任务计划页登记，自动训练及发布尚未接入；采集使用共享论文目录。</p>
  <label className="config-approve"><input type="checkbox" checked={approved} disabled={locked} onChange={e=>setApproved(e.target.checked)}/>确认教师许可、用途和本次采集预算</label>
  {message&&<div role="status" className="config-message">{message}</div>}
  </div><div className="config-actions"><button disabled={locked||!ready} onClick={()=>void launch()}>▶ 一键启动单次语料流水线</button><div><button disabled={!editable||target?.row.state!=="running"} onClick={()=>void control("pause")}>Ⅱ 暂停</button><button disabled={!editable||!["running","pause_requested"].includes(String(target?.row.state))} onClick={()=>void control("cancel")}>■ 停止</button></div></div>

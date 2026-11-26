@@ -93,7 +93,7 @@ const evaluationWorker:WorkerStatus={running:false,stop_requested:false,message:
 const evaluationRoot=resolve(process.env.RPDISTILL_EVALUATION_ROOT||join(homedir(),".rpdistill","evaluations"));
 const assetWorker:WorkerStatus={running:false,stop_requested:false,message:"学生资源下载未启动"};
 function startAssets():ModelReply{
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
  assetWorker.running=true;assetWorker.message="正在获取固定版本分词器资源";
  const child=spawn(python,["-I","-m","rpdistill","--db",db,"student-assets","--root",assets,"--max-bytes","4194304"],{
   shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
@@ -110,7 +110,7 @@ function startAssets():ModelReply{
  return {ok:true,data:{...assetWorker}};
 }
 function startTraining():ModelReply{
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
  trainingWorker.running=true;trainingWorker.message="正在执行队列首个已授权训练任务";
  const child=spawn(python,["-I","-m","rpdistill","--db",db,"training-run"],{shell:false,windowsHide:true,
   stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8",CUBLAS_WORKSPACE_CONFIG:":4096:8"}});
@@ -128,7 +128,7 @@ function startTraining():ModelReply{
 }
 const corpusWorker:{running:boolean;id:string|null;message:string}={running:false,id:null,message:"语料执行器未启动"};
 function startCorpus(id:string):ModelReply{
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
  corpusWorker.running=true;corpusWorker.id=id;corpusWorker.message="正在执行单次语料流水线";
  const child=spawn(python,["-I","-m","rpdistill","--db",db,"pipeline-run",id],{
   shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
@@ -173,7 +173,7 @@ function nextDownload(){
 }
 function workerAction(kind:string):ModelReply{
  if(kind==="worker-start"){
-  if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
+  if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
   worker.running=true;worker.stop_requested=false;worker.message="正在启动执行器";
   setImmediate(nextDownload);
   return {ok:true,data:{...worker}};
@@ -184,7 +184,7 @@ function workerAction(kind:string):ModelReply{
 }
 let modelPending=false;
 async function startEvaluation(args:string[]):Promise<ModelReply>{
- if(!win||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
+ if(!win||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
  evaluationWorker.running=true;evaluationWorker.message="等待选择人工审核 JSONL";
  let input:string;
  try{
@@ -204,7 +204,7 @@ async function startEvaluation(args:string[]):Promise<ModelReply>{
  return {ok:true,data:{...evaluationWorker}};
 }
 function startArtifact(args:string[]):ModelReply{
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
  evaluationWorker.running=true;evaluationWorker.message="正在构建或评测本地候选模型";
  const root=resolve(process.env.RPDISTILL_ARTIFACT_ROOT||join(homedir(),".rpdistill","artifacts"));
  const child=spawn(python,["-I","-m","rpdistill","--db",db,...args,"--evaluation-root",evaluationRoot,"--root",root],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
@@ -218,7 +218,7 @@ function startArtifact(args:string[]):ModelReply{
  return {ok:true,data:{...evaluationWorker}};
 }
 async function startReview(args:string[]):Promise<ModelReply>{
- if(!win||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
+ if(!win||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
  const mode=args[3];
  evaluationWorker.running=true;evaluationWorker.message="正在准备本地复核";
  if(mode==="rust"||mode==="integration"){
@@ -265,12 +265,12 @@ async function activateEnvironment(next:Managed|null){
 }
 async function selectEnvironment(id:string):Promise<ModelReply>{
  if(!win||!app.isPackaged||override||smoke||process.platform!=="win32")return {ok:false,error:"安装版且无外部覆盖时才可切换"};
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器"};
  environmentWorker.running=true;environmentWorker.message="检查持久任务及目标环境";
  try{
   // The bundled backend can inspect the DB even if the selected Python is broken.
   const state=await queryWith(basePython);
-  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active"].some(k=>state.data.counts[k]>0))throw Error("active");
+  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active","plan_active"].some(k=>state.data.counts[k]>0))throw Error("active");
   if(id==="base"){
    if(managed||existsSync(activeFile))await activateEnvironment(null);
    environmentWorker.message="已切换基础后端，训练环境仍保留";
@@ -301,11 +301,11 @@ async function selectEnvironment(id:string):Promise<ModelReply>{
 }
 async function startEnvironment(profile:string):Promise<ModelReply>{
  if(!win||!app.isPackaged||override||smoke||process.platform!=="win32")return {ok:false,error:"仅正式安装候选可部署；请取消外部环境覆盖后重启"};
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器"};
  environmentWorker.running=true;environmentWorker.message="检查当前持久任务";
  try{
   const state=await query();
-  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active"].some(k=>state.data.counts[k]>0))throw Error("active");
+  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active","plan_active"].some(k=>state.data.counts[k]>0))throw Error("active");
   const wheel=wheelPath();
   const choice=await dialog.showOpenDialog(win,{title:"选择可信的 64 位 Python 3.11 或 3.12 python.exe",properties:["openFile"],filters:[{name:"Python executable",extensions:["exe"]}]});
   if(choice.canceled||choice.filePaths.length!==1){environmentWorker.running=false;environmentWorker.message="已取消";return {ok:false,error:"已取消选择"}}
@@ -336,9 +336,56 @@ async function startEnvironment(profile:string):Promise<ModelReply>{
   return {ok:true,data:{...environmentWorker}};
  }catch{environmentWorker.running=false;environmentWorker.message="预检或选择失败；原环境未改变";return {ok:false,error:environmentWorker.message}}
 }
+const planWorker:WorkerStatus&{id:string|null;in_cycle:boolean}={running:false,stop_requested:false,message:"计划调度未启动",id:null,in_cycle:false};
+let planTimer:ReturnType<typeof setTimeout>|undefined;
+function finishPlan(message:string){
+ if(planTimer)clearTimeout(planTimer);planTimer=undefined;
+ planWorker.running=false;planWorker.stop_requested=false;planWorker.in_cycle=false;planWorker.id=null;planWorker.message=message;
+}
+function nextPlan(){
+ planTimer=undefined;
+ if(planWorker.in_cycle)return;
+ if(!planWorker.running||!planWorker.id||planWorker.stop_requested){finishPlan("已停止后续轮次");return}
+ const id=planWorker.id;
+ planWorker.in_cycle=true;planWorker.message="检查计划到期或执行已授权轮次";
+ const child=spawn(python,["-I","-m","rpdistill","--db",db,"plan-tick",id,"--approved"],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+ const chunks:Buffer[]=[];let size=0,failed=false;
+ child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else failed=true});
+ child.stderr.resume();child.on("error",()=>{failed=true});
+ child.on("close",code=>{
+  planWorker.in_cycle=false;
+  if(code!==0||failed){finishPlan("计划执行异常，核对持久状态；不自动重试");return}
+  try{
+   const r=JSON.parse(Buffer.concat(chunks).toString("utf8"));
+   if(r.id!==id)throw Error("plan identity");
+   if(planWorker.stop_requested){finishPlan("当前轮次结束，已停止后续调度");return}
+   if(r.state==="complete"){finishPlan("全部授权轮次已完成；候选仍需审核");return}
+   if(r.state!=="ready"&&r.state!=="waiting"){finishPlan("计划已停止：候选不足或执行失败");return}
+   const due=Date.parse(r.next_due);if(!Number.isFinite(due))throw Error("due");
+   planWorker.message="等待下一授权轮次："+r.next_due;
+   planTimer=setTimeout(nextPlan,Math.max(1000,Math.min(60000,due-Date.now())));
+  }catch{finishPlan("计划响应异常；不自动重试")}
+ });
+}
+function startPlan(id:string):ModelReply{
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器"};
+ planWorker.id=id;planWorker.running=true;planWorker.stop_requested=false;planWorker.message="计划调度已启动";
+ planTimer=setTimeout(nextPlan,0);
+ return {ok:true,data:{...planWorker}};
+}
+function stopPlan():ModelReply{
+ if(!planWorker.running)return {ok:false,error:"本地计划调度未启动"};
+ planWorker.stop_requested=true;
+ if(!planWorker.in_cycle)finishPlan("已停止后续轮次，计划预算保留");
+ else planWorker.message="当前轮次结束后停止；不强制终止下载";
+ return {ok:true,data:{...planWorker}};
+}
 function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
+ if(args[0]==="plan-stop")return Promise.resolve(stopPlan());
+ if(planWorker.running)return Promise.resolve({ok:false,error:"请先停止周期计划，再操作其他任务"});
+ if(args[0]==="plan-start"){if(degraded)return Promise.resolve({ok:false,error:"训练环境不可用"});return Promise.resolve(startPlan(args[1]));}
  if(args[0]==="environment-deploy")return startEnvironment(args[1]);
  if(args[0]==="environment-select")return selectEnvironment(args[1]);
  if(degraded)return Promise.resolve({ok:false,error:"当前训练环境不可用，请在设置中切换基础后端或重新部署"});
@@ -387,7 +434,7 @@ function create(){
   win.webContents.on("will-navigate",(e,url)=>{if(url!==allowedURL)e.preventDefault()});
   win.webContents.on("will-attach-webview",e=>e.preventDefault());
   win.on("close",event=>{
-    if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running){event.preventDefault();dialog.showMessageBoxSync(win!,{type:"info",title:"执行器仍在运行",message:"请等待环境部署、语料、学生资源或评测任务完成，或先暂停/取消模型下载及训练任务，再关闭窗口。"});}
+    if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running){event.preventDefault();dialog.showMessageBoxSync(win!,{type:"info",title:"执行器仍在运行",message:"请先停止周期计划，等待当前轮次、环境部署、语料或评测结束，或暂停/取消下载及训练，再关闭窗口。"});}
   });
   win.on("closed",()=>{win=null});
   if(smoke)win.setContentSize(1672,941);
@@ -400,7 +447,7 @@ app.whenReady().then(()=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
        event.senderFrame!==win.webContents.mainFrame)return {ok:false,error:"请求来源无效"} satisfies Reply;
     const reply=await query();
-    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker},local_corpus_worker:{...corpusWorker},local_training_worker:{...trainingWorker},local_asset_worker:{...assetWorker},local_evaluation_worker:{...evaluationWorker},local_environment_worker:{...environmentWorker},environment:{deploy_available:app.isPackaged&&!override&&!smoke,source:override?"external":managed?"managed":"base",profile:managed?.profile??null,torch:managed?.torch??null,cuda_available:managed?.cuda_available??null,active_id:managed?.id??null,degraded,inventory:environmentInventory()}}}:reply;
+    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker},local_corpus_worker:{...corpusWorker},local_training_worker:{...trainingWorker},local_asset_worker:{...assetWorker},local_evaluation_worker:{...evaluationWorker},local_environment_worker:{...environmentWorker},local_plan_worker:{...planWorker},environment:{deploy_available:app.isPackaged&&!override&&!smoke,source:override?"external":managed?"managed":"base",profile:managed?.profile??null,torch:managed?.torch??null,cuda_available:managed?.cuda_available??null,active_id:managed?.id??null,degraded,inventory:environmentInventory()}}}:reply;
   });
   ipcMain.handle("studio:model-action",(event,request:unknown)=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
@@ -429,5 +476,5 @@ app.whenReady().then(()=>{
   create();
   app.on("activate",()=>{if(!win)create()});
 });
-app.on("before-quit",event=>{if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running){event.preventDefault();if(win)dialog.showMessageBoxSync(win,{type:"info",message:"执行器仍在运行，请先结束当前任务。"});}});
+app.on("before-quit",event=>{if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running){event.preventDefault();if(win)dialog.showMessageBoxSync(win,{type:"info",message:"执行器仍在运行，请先结束当前任务。"});}});
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit()});

@@ -70,9 +70,13 @@ class CorpusPipeline:
                        (run_id,json.dumps(spec),stamp()))
         return self.get(run_id)
 
-    def run(self,run_id,*,search=discover_with_source,teacher_loader=load_teacher):
+    def run(self,run_id,*,search=discover_with_source,teacher_loader=load_teacher,plan_id=None):
         with closing(self.connect()) as db,db:
             db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_plan_cycles'").fetchone():
+                owner=db.execute("SELECT plan_id FROM studio_plan_cycles WHERE run_id=?",(run_id,)).fetchone()
+                if owner and (owner[0]!=plan_id or not db.execute("SELECT 1 FROM studio_plans WHERE id=? AND state='running' AND active_run=?",(plan_id,run_id)).fetchone()):
+                    raise ValueError("scheduled run belongs to its plan")
             if db.execute("SELECT 1 FROM corpus_runs WHERE state='running' LIMIT 1").fetchone():
                 raise ValueError("a corpus worker is already active")
             updated=db.execute("UPDATE corpus_runs SET state='running',error=NULL,updated=? WHERE id=? AND state='queued'",
@@ -137,6 +141,8 @@ class CorpusPipeline:
         # Do not replay acquisition automatically; create a new authorized cycle.
         with closing(self.connect()) as db,db:
             db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_plan_cycles'").fetchone() and db.execute("SELECT 1 FROM studio_plan_cycles WHERE run_id=?",(run_id,)).fetchone():
+                raise ValueError("scheduled run must be recovered through its plan")
             row=db.execute("SELECT stage,state FROM corpus_runs WHERE id=?",(run_id,)).fetchone()
             if not row:
                 raise KeyError("unknown corpus run")

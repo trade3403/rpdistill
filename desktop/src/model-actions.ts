@@ -9,6 +9,20 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "plan-create":
+  exact(["kind","id","license","interval_minutes","max_cycles","total_bytes","approved"]);
+  if(!job(r.id)||typeof r.license!=="string"||!r.license.trim()||r.license.length>100||/[\x00-\x1f\x7f]/.test(r.license)||!integer(r.interval_minutes,5,10080)||!integer(r.max_cycles,1,10)||!integer(r.total_bytes,1,2**40)||r.approved!==true)throw Error("plan approval");
+  return ["plan-create",r.id,"--license="+r.license,"--interval-minutes",String(r.interval_minutes),"--max-cycles",String(r.max_cycles),"--total-bytes",String(r.total_bytes),"--approved"];
+ case "plan-start":case "plan-cancel":
+  exact(["kind","id","approved"]);
+  if(!job(r.id)||r.approved!==true)throw Error("plan approval");
+  return [r.kind,r.id,"--approved"];
+ case "plan-stop":
+  exact(["kind"]);return ["plan-stop"];
+ case "plan-recover":
+  exact(["kind","id","worker_stopped"]);
+  if(!job(r.id)||r.worker_stopped!==true)throw Error("plan recovery");
+  return ["plan-recover",r.id,"--worker-stopped"];
  case "environment-select":
   exact(["kind","id","approved"]);
   if((r.id!=="base"&&!job(r.id))||r.approved!==true)throw Error("environment selection");

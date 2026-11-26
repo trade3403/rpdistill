@@ -16,8 +16,15 @@ SCHEMA="rpdistill-studio-snapshot-v1"
 TABLES={"teachers":"teachers","modelscope_teachers":"modelscope_teachers",
         "downloads":"model_download_jobs","papers":"papers","fulltexts":"paper_fulltexts",
         "segments":"corpus_segments","pairs":"corpus_pairs","datasets":"dataset_versions",
-        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations","artifacts":"studio_artifacts","reviews":"studio_reviews"}
+        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations","artifacts":"studio_artifacts","reviews":"studio_reviews","plans":"studio_plans","plan_cycles":"studio_plan_cycles"}
 QUERIES={
+    "plans":"""SELECT id,template_id,interval_minutes,max_cycles,claimed,state,active_run,next_due,error,updated,license,
+        json_extract(spec,'$.model_id') AS model_id,json_extract(spec,'$.revision') AS revision,
+        json_extract(spec,'$.query.keywords[0]') AS keyword,json_extract(spec,'$.max_bytes') AS max_bytes
+        FROM studio_plans ORDER BY updated DESC,id LIMIT 50""",
+    "plan_cycles":"""SELECT c.plan_id,c.cycle,c.run_id,r.state,r.stage,r.updated,
+        json_extract(r.results,'$.snapshot.version') AS dataset_version
+        FROM studio_plan_cycles c JOIN corpus_runs r ON r.id=c.run_id ORDER BY r.updated DESC,c.run_id LIMIT 50""",
     "reviews":"""SELECT id,source_id,kind,state,error,updated,
         json_extract(summary,'$.package_id') AS package_id,json_extract(summary,'$.parity_passed') AS parity_passed,
         json_extract(summary,'$.receipt_id') AS receipt_id,json_extract(summary,'$.integration_passed') AS integration_passed,
@@ -59,6 +66,10 @@ QUERIES={
         substr(json_extract(spec,'$.model_id'),1,200) AS model_id,
         substr(json_extract(spec,'$.query.keywords[0]'),1,200) AS keyword,
         json_extract(spec,'$.max_bytes') AS max_bytes,
+        json_extract(spec,'$.revision') AS revision,coalesce(json_extract(spec,'$.source'),'huggingface') AS source,
+        json_extract(spec,'$.query.start_date') AS start_date,json_extract(spec,'$.query.end_date') AS end_date,
+        json_extract(spec,'$.query.limit') AS search_limit,json_extract(spec,'$.segment_limit') AS segment_limit,
+        json_extract(spec,'$.options.device') AS device,json_extract(spec,'$.options.dtype') AS dtype,
         json_extract(spec,'$.paper_limit') AS paper_limit,
         json_extract(results,'$.snapshot.version') AS dataset_version
         FROM corpus_runs ORDER BY updated DESC,id LIMIT 50""",
@@ -112,7 +123,7 @@ def student_resources(assets,checkpoint_root):
 def snapshot(db_path):
     path=Path(db_path).expanduser().resolve()
     counts={key:0 for key in TABLES}
-    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,evaluation_active=0,artifact_active=0,review_active=0)
+    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,evaluation_active=0,artifact_active=0,review_active=0,plan_active=0)
     rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers","training_loss","training_events")}
     exists=path.exists()
     if exists:
@@ -170,6 +181,8 @@ def snapshot(db_path):
                 counts["artifact_active"]=db.execute("SELECT count(*) FROM studio_artifacts WHERE state='running'").fetchone()[0]
             if TABLES["reviews"] in available:
                 counts["review_active"]=db.execute("SELECT count(*) FROM studio_reviews WHERE state='running'").fetchone()[0]
+            if TABLES["plans"] in available:
+                counts["plan_active"]=db.execute("SELECT count(*) FROM studio_plans WHERE state='running'").fetchone()[0]
             for key,sql in QUERIES.items():
                 if TABLES[key] in available:
                     if key=="downloads":
