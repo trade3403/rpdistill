@@ -6,7 +6,7 @@ export interface Snapshot {
   student_resources?:{state:"missing"|"invalid"|"verified";source:string;revision:string;file_count:number;asset_bytes:number;assets_free_bytes:number|null;checkpoint_free_bytes:number|null;dependencies:Record<string,boolean>;runtime_verified:false};
   local_asset_worker?:WorkerStatus;
   local_environment_worker?:WorkerStatus;
-  environment?:{deploy_available:boolean;source:"external"|"managed"|"base";profile:"cpu"|"cu128"|null;torch:string|null;cuda_available:boolean|null};
+  environment?:{deploy_available:boolean;source:"external"|"managed"|"base";profile:"cpu"|"cu128"|null;torch:string|null;cuda_available:boolean|null;active_id:string|null;degraded:boolean;inventory:{id:string;profile:"cpu"|"cu128"|null;torch:string|null;state:"verified"|"unavailable"}[]};
   local_evaluation_worker?:WorkerStatus;
   local_worker?:WorkerStatus;
   local_training_worker?:WorkerStatus;
@@ -30,6 +30,7 @@ export type ModelRequest =
  | {kind:"pipeline-run";id:string;approved:boolean}
  | {kind:"pipeline-resume";id:string;worker_stopped:boolean}
  | {kind:"training-enqueue";version:string;license:string;steps:number;batch_size:number;learning_rate:number;accumulation:number;device:string;precision:string;cuda_bytes:number;segment_steps:number;segment_seconds:number;total_seconds:number;checkpoint_bytes:number;total_checkpoint_bytes:number;approved:boolean}
+ | {kind:"environment-select";id:string;approved:boolean}
  | {kind:"environment-deploy";profile:"cpu"|"cu128";approved:boolean}
  | {kind:"student-assets";approved:boolean}
  | {kind:"review-run";id:string;mode:"rust"|"blind"|"collect";timeout_seconds:number;approved:boolean}

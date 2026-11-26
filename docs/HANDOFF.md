@@ -185,3 +185,7 @@ ca1760b 标准 CI 45746734363 为6/10 success，四个 macOS/Windows Python 3.11
 
 ## E11d3b1 独立训练环境部署（开发分支，待 CI）
 前置11f5cd5标准45775088310、专项45775088292全通过；安装验收 job139756704221实际EXE 106190202字节 SHA256 fa6be9d9fe78156f7a3a23855ece0e99666b3256cf56ba9f0d529046619cc820，安装/快捷方式/隔离PATH内置后端/卸载/外部数据均通过，未签名候选。新增设置页固定 CPU 或 CUDA12.8 PyTorch2.7.1，预装可信Win x64 Python3.11/3.12后通过原生选择及再次确认；独立新venv、12/25GiB空闲空间预检（非硬配额）、固定官方torch索引/PyPI二进制依赖、隔离pip/Python环境，逐阶段状态；pip check、真实CPU张量/选CUDA则真实CUDA张量、全部SDK导入及后端快照校验后写 verified.json，绑定安装包精确wheel SHA256。主进程原子登记active.json，后续启动恢复验证过的独立环境，版本/wheel变更回退基础，外部RPDISTILL_PYTHON优先且禁止部署；失败不替换旧环境、保留未完成目录供人工核对，正常关闭保护、本地执行器互斥。新增Windows专项实际CPU联网部署（无GUI点击/激活验收）及拒绝无授权/路径注入测试。尚未通过新CI；用户需预装Python，不自动安装系统Python；CUDA实际硬件/GUI完整部署/升级和回滚、硬预算/依赖锁定/签名仍待后续。E11d3b2完善环境切换、修复及安装体验，后续E12真实GPU/人审全链路。Windows GUI only，Europe PMC暂缓，D线只读，未合并main。
+
+
+## E11d3b2 历史环境切换、回滚与首次使用引导（开发分支，待 CI）
+前置4c79974标准45777901058 success；专项45777901054 attempt1仅NSIS安装0xC0000005失败，未改代码重跑attempt2全success，不能确认根因。实际CPU环境部署job139765948256完成PyTorch2.7.1+cpu、七依赖发现、真实张量、后端快照与wheel绑定。新增设置页最多50个历史目录（按ID），切换前离线recheck：固定注册ID、精确wheel hash、收据、pip check、实际CPU/按profile CUDA张量、后端协议，失败不改原active指针；基础回滚保留所有历史目录，修复以新建环境替代就地修改。已选环境查询失败时内置基础后端提供只读快照、锁定普通任务、允许在设置中恢复；持久任务或本地执行器活动时拒绝切换。首次使用工作台底栏引导进入设置，未自动联网；外部Python覆盖继续优先。Windows专项实际CPU环境重复验证、篡改wheel pin拒绝、恢复后再验；安装器增加同版本覆盖安装及外部测试数据、快捷方式保留，再实际启动卸载。GUI点击切换/回滚、真实跨版本迁移、系统Python安装、CUDA/真实GPU训练仍待验收；本轮无签名/完整传递依赖锁定。下一阶段新CI全绿后，进入E12真实GPU/教师/质量与全自动链路剩余缺口验收（持续调度尚未完整实现），Windows GUI only，Europe PMC暂缓，D线只读，未合并main。

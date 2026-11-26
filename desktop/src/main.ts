@@ -29,7 +29,7 @@ function readManaged(id:unknown):Managed{
  for(const p of [envRoot,root,join(root,"Scripts"),exe,join(root,"verified.json")]){
   if(lstatSync(p).isSymbolicLink())throw Error("symlink");
  }
- if(!lstatSync(exe).isFile())throw Error("python");
+ if(!lstatSync(exe).isFile()||!lstatSync(join(root,"verified.json")).isFile()||lstatSync(join(root,"verified.json")).size>16384)throw Error("python");
  const m=JSON.parse(readFileSync(join(root,"verified.json"),"utf8")) as Managed;
  if(m.schema!=="rpdistill-managed-environment-v1")throw Error("schema");
  if(m.id!==id||m.runtime_verified!==true||!["cpu","cu128"].includes(m.profile)||m.backend!==app.getVersion()||
@@ -40,17 +40,16 @@ function readManaged(id:unknown):Managed{
 let managed:Managed|null=null;
 let envMessage="尚未部署独立训练环境";
 if(!override&&!smoke&&app.isPackaged&&existsSync(activeFile)){
- try{managed=readManaged(JSON.parse(readFileSync(activeFile,"utf8")).id);envMessage="已启用登记的训练环境（历史验证）"}catch{envMessage="已登记环境无效或版本变化，已回退基础后端"}
+ try{const pin=JSON.parse(readFileSync(activeFile,"utf8"));if(pin.id!==null){managed=readManaged(pin.id);envMessage="已启用登记的训练环境（历史验证）"}else envMessage="已选择基础后端"}catch{envMessage="已登记环境无效或版本变化，已回退基础后端"}
 }
 let python=override||(managed?join(envRoot,managed.id,"Scripts","python.exe"):basePython);
 const environmentWorker:WorkerStatus={running:false,stop_requested:false,message:envMessage};
 
 const db=resolve(process.env.RPDISTILL_DB || join(homedir(),".rpdistill","tasks.sqlite3"));
 let pending:Promise<Reply>|undefined;
-function query():Promise<Reply>{
-  if(pending)return pending;
-  pending=new Promise<Reply>(done=>{
-    const child=spawn(python,["-I","-m","rpdistill","--db",db,"studio-snapshot"],
+function queryWith(executable:string):Promise<Reply>{
+  return new Promise<Reply>(done=>{
+    const child=spawn(executable,["-I","-m","rpdistill","--db",db,"studio-snapshot"],
       {shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],
        env:{...process.env,PYTHONIOENCODING:"utf-8"}});
     const chunks:Buffer[]=[];let size=0,settled=false;
@@ -70,8 +69,19 @@ function query():Promise<Reply>{
         finish({ok:true,data:value});
       }catch{finish({ok:false,error:"后端协议不兼容"})}
     });
-  }).finally(()=>{pending=undefined});
-  return pending;
+  });
+}
+let degraded=false;
+function query():Promise<Reply>{
+ if(pending)return pending;
+ const executable=python;
+ pending=queryWith(executable).then(async result=>{
+  if(python!==executable)return result;
+  degraded=!result.ok&&!!managed;
+  if(degraded)return queryWith(basePython);
+  return result;
+ }).finally(()=>{pending=undefined});
+ return pending;
 }
 // Only explicitly started, approved persistent jobs run. A worker never kills an active
 // download on pause/stop: cooperative checkpoints and DB state remain authoritative.
@@ -235,6 +245,60 @@ async function startReview(args:string[]):Promise<ModelReply>{
  });
  return {ok:true,data:{...evaluationWorker}};
 }
+function environmentInventory(){
+ if(!app.isPackaged||override||smoke)return [];
+ try{
+  if(lstatSync(envRoot).isSymbolicLink())return [];
+  return readdirSync(envRoot,{withFileTypes:true}).filter(d=>d.isDirectory()&&!d.isSymbolicLink()&&/^[a-f0-9]{32}$/.test(d.name)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,50).map(d=>{
+   try{const m=readManaged(d.name);return {id:d.name,profile:m.profile,torch:m.torch,state:"verified" as const}}
+   catch{return {id:d.name,profile:null,torch:null,state:"unavailable" as const}}
+  });
+ }catch{return []}
+}
+async function activateEnvironment(next:Managed|null){
+ if(!existsSync(envRoot))throw Error("environment root missing");
+ if(lstatSync(envRoot).isSymbolicLink())throw Error("environment root linked");
+ const tmp=join(envRoot,"active-"+randomUUID()+".json");
+ await writeFile(tmp,JSON.stringify({id:next?.id??null}),{flag:"wx"});
+ await rename(tmp,activeFile);
+ managed=next;python=next?join(envRoot,next.id,"Scripts","python.exe"):basePython;degraded=false;
+}
+async function selectEnvironment(id:string):Promise<ModelReply>{
+ if(!win||!app.isPackaged||override||smoke||process.platform!=="win32")return {ok:false,error:"安装版且无外部覆盖时才可切换"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器"};
+ environmentWorker.running=true;environmentWorker.message="检查持久任务及目标环境";
+ try{
+  // The bundled backend can inspect the DB even if the selected Python is broken.
+  const state=await queryWith(basePython);
+  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active"].some(k=>state.data.counts[k]>0))throw Error("active");
+  if(id==="base"){
+   if(managed||existsSync(activeFile))await activateEnvironment(null);
+   environmentWorker.message="已切换基础后端，训练环境仍保留";
+   environmentWorker.running=false;
+   return {ok:true,data:{...environmentWorker}};
+  }
+  const expected=readManaged(id);
+  environmentWorker.message="离线重新验证历史环境";
+  const child=spawn(basePython,["-I","-m","rpdistill.studio_environment","--wheel",wheelPath(),"--root",envRoot,"--recheck-id",id,"--approved"],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+  let size=0,failed=false;const chunks:Buffer[]=[];
+  child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=65536)chunks.push(chunk);else failed=true});
+  child.stderr.resume();child.on("error",()=>{failed=true});
+  child.on("close",async code=>{
+   try{
+    if(code!==0||failed)throw Error("recheck");
+    const lines=Buffer.concat(chunks).toString("utf8").trim().split("\n").map(x=>JSON.parse(x));
+    const result=lines[lines.length-1];
+    if(result.stage!=="complete"||result.id!==id)throw Error("recheck identity");
+    const next=readManaged(id);
+    if(JSON.stringify(next)!==JSON.stringify(expected))throw Error("receipt changed");
+    await activateEnvironment(next);
+    environmentWorker.message="历史环境重新验证通过并启用";
+   }catch{environmentWorker.message="重新验证失败，未切换当前环境；可新建环境修复"}
+   finally{environmentWorker.running=false}
+  });
+  return {ok:true,data:{...environmentWorker}};
+ }catch{environmentWorker.running=false;environmentWorker.message="无法切换：请核对持久任务或环境记录";return {ok:false,error:environmentWorker.message}}
+}
 async function startEnvironment(profile:string):Promise<ModelReply>{
  if(!win||!app.isPackaged||override||smoke||process.platform!=="win32")return {ok:false,error:"仅正式安装候选可部署；请取消外部环境覆盖后重启"};
  if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||modelPending)return {ok:false,error:"本地已有执行器"};
@@ -264,10 +328,7 @@ async function startEnvironment(profile:string):Promise<ModelReply>{
    try{
     if(code!==0||failed||!id)throw Error("deployment");
     const next=readManaged(id);
-    const tmp=join(envRoot,"active-"+randomUUID()+".json");
-    await writeFile(tmp,JSON.stringify({id}),{flag:"wx"});
-    await rename(tmp,activeFile);
-    managed=next;python=join(envRoot,id,"Scripts","python.exe");
+    await activateEnvironment(next);
     environmentWorker.message="新训练环境已启用，实际 GPU 训练仍需验收";
    }catch{environmentWorker.message="部署或登记失败；原环境未切换，可重新授权创建新环境"}
    finally{environmentWorker.running=false}
@@ -279,6 +340,8 @@ function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
  if(args[0]==="environment-deploy")return startEnvironment(args[1]);
+ if(args[0]==="environment-select")return selectEnvironment(args[1]);
+ if(degraded)return Promise.resolve({ok:false,error:"当前训练环境不可用，请在设置中切换基础后端或重新部署"});
  if(environmentWorker.running)return Promise.resolve({ok:false,error:"训练环境正在部署，暂不可操作任务"});
  if(args[0]==="worker-start"||args[0]==="worker-stop")return Promise.resolve(workerAction(args[0]));
  if(args[0]==="studio-review")return startReview(args);
@@ -337,7 +400,7 @@ app.whenReady().then(()=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
        event.senderFrame!==win.webContents.mainFrame)return {ok:false,error:"请求来源无效"} satisfies Reply;
     const reply=await query();
-    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker},local_corpus_worker:{...corpusWorker},local_training_worker:{...trainingWorker},local_asset_worker:{...assetWorker},local_evaluation_worker:{...evaluationWorker},local_environment_worker:{...environmentWorker},environment:{deploy_available:app.isPackaged&&!override&&!smoke,source:override?"external":managed?"managed":"base",profile:managed?.profile??null,torch:managed?.torch??null,cuda_available:managed?.cuda_available??null}}}:reply;
+    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker},local_corpus_worker:{...corpusWorker},local_training_worker:{...trainingWorker},local_asset_worker:{...assetWorker},local_evaluation_worker:{...evaluationWorker},local_environment_worker:{...environmentWorker},environment:{deploy_available:app.isPackaged&&!override&&!smoke,source:override?"external":managed?"managed":"base",profile:managed?.profile??null,torch:managed?.torch??null,cuda_available:managed?.cuda_available??null,active_id:managed?.id??null,degraded,inventory:environmentInventory()}}}:reply;
   });
   ipcMain.handle("studio:model-action",(event,request:unknown)=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||

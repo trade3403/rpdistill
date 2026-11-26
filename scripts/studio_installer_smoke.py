@@ -35,6 +35,12 @@ def main():
                 raise ValueError("installation shortcuts missing")
             sentinel=root/"user-data.sqlite3"
             sentinel.write_bytes(b"preserve independent user data")
+            # Same-version reinstall, not a cross-version migration test.
+            subprocess.run([str(installer),"/S","/D="+str(install)],check=True,timeout=180)
+            if not exe.is_file() or sentinel.read_bytes()!=b"preserve independent user data":
+                raise ValueError("reinstall did not preserve application and independent data")
+            if not desktop.is_file() or not menu.is_file():
+                raise ValueError("reinstall shortcuts missing")
             smoke=Path(__file__).with_name("studio_desktop_smoke.py")
             subprocess.run([sys.executable,str(smoke),"--installed",str(exe)],check=True,timeout=180)
         finally:
@@ -51,7 +57,7 @@ def main():
             raise ValueError("independent user data changed")
         report={"installer_sha256":hashlib.file_digest(installer.open("rb"),"sha256").hexdigest(),
                 "bytes":installer.stat().st_size,"installed_launch":True,"bundled_base_backend":True,
-                "shortcuts":True,"uninstalled":True,"isolated_user_data_preserved":True,
+                "shortcuts":True,"same_version_reinstall":True,"uninstalled":True,"isolated_user_data_preserved":True,
                 "signed":False,"release_ready":False}
         args.report.write_text(json.dumps(report,indent=2),encoding="utf-8")
         print(json.dumps(report))

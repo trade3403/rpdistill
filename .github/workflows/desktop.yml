@@ -106,3 +106,26 @@ jobs:
           $exe = Join-Path $receipt[0].DirectoryName "Scripts/python.exe"
           & $exe -I -m rpdistill --db "$root/probe.sqlite3" studio-snapshot
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Recheck actual registered environment and reject tampered receipt
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "rpdistill-managed-ci"
+          $wheel = @(Get-ChildItem desktop/build/backend/wheels/rpdistill-*.whl)
+          $receipt = @(Get-ChildItem "$root/*/verified.json")
+          if ($wheel.Count -ne 1 -or $receipt.Count -ne 1) { throw "Missing deployment evidence" }
+          $id = $receipt[0].Directory.Name
+          & desktop/build/backend/python.exe -I -m rpdistill.studio_environment --wheel "$($wheel[0].FullName)" --root "$root" --recheck-id "$id" --approved
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $original = Get-Content $receipt[0].FullName -Raw
+          try {
+            $bad = $original | ConvertFrom-Json
+            $bad.wheel_sha256 = "0" * 64
+            $bad | ConvertTo-Json -Compress | Set-Content $receipt[0].FullName -Encoding utf8
+            & desktop/build/backend/python.exe -I -m rpdistill.studio_environment --wheel "$($wheel[0].FullName)" --root "$root" --recheck-id "$id" --approved
+            if ($LASTEXITCODE -eq 0) { throw "Tampered receipt accepted" }
+            Write-Output "tampered_environment_receipt_rejected=true"
+          } finally {
+            Set-Content $receipt[0].FullName -Value $original -Encoding utf8 -NoNewline
+          }
+          & desktop/build/backend/python.exe -I -m rpdistill.studio_environment --wheel "$($wheel[0].FullName)" --root "$root" --recheck-id "$id" --approved
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

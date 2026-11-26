@@ -9,6 +9,10 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "environment-select":
+  exact(["kind","id","approved"]);
+  if((r.id!=="base"&&!job(r.id))||r.approved!==true)throw Error("environment selection");
+  return ["environment-select",r.id];
  case "environment-deploy":
   exact(["kind","profile","approved"]);
   if((r.profile!=="cpu"&&r.profile!=="cu128")||r.approved!==true)throw Error("environment approval");

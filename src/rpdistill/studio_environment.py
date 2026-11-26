@@ -96,14 +96,64 @@ def deploy(python,wheel,root,profile,*,approved=False):
     print(json.dumps({"stage":"complete","id":id}),flush=True)
     return receipt
 
+def recheck(wheel,root,id,*,approved=False):
+    """Offline verification before selecting an existing managed environment."""
+    if approved is not True or sys.platform!="win32" or not isinstance(id,str) or not re.fullmatch(r"[a-f0-9]{32}",id):
+        raise ValueError("explicit registered environment approval required")
+    root=Path(root).absolute()
+    dest=root/id
+    exe=dest/"Scripts"/"python.exe"
+    path=dest/"verified.json"
+    for item in (root,dest,dest/"Scripts",exe,path):
+        if item.is_symlink() or (hasattr(item,"is_junction") and item.is_junction()):
+            raise ValueError("linked environment path")
+    if not exe.is_file() or not path.is_file() or path.stat().st_size>16384:
+        raise ValueError("missing registered environment")
+    with Path(wheel).open("rb") as stream:
+        wheel_hash=hashlib.file_digest(stream,"sha256").hexdigest()
+    receipt=json.loads(path.read_text(encoding="utf-8"))
+    profile=receipt.get("profile")
+    if (receipt.get("schema")!="rpdistill-managed-environment-v1" or receipt.get("id")!=id or
+        receipt.get("runtime_verified") is not True or receipt.get("backend")!=__version__ or
+        receipt.get("wheel_sha256")!=wheel_hash or profile not in PROFILES):
+        raise ValueError("environment receipt or wheel mismatch")
+    stage("verify")
+    run([exe,"-I","-m","pip","--isolated","check"],120)
+    measured=json.loads(run([exe,"-I","-c",VERIFY,profile,__version__],180,capture=True).stdout)
+    for k in ("torch","cuda_available","cuda_version","backend"):
+        if measured[k]!=receipt[k]:
+            raise ValueError("environment runtime changed")
+    # Use an absent, randomized path; snapshot must not create a database.
+    probe=dest/("probe-"+uuid4().hex+".sqlite3")
+    snapshot=json.loads(run([exe,"-I","-m","rpdistill","--db",probe,"studio-snapshot"],60,capture=True).stdout)
+    if snapshot.get("version")!=__version__ or snapshot.get("read_only") is not True or snapshot.get("database_exists") is not False or probe.exists():
+        raise ValueError("backend protocol verification failed")
+    with Path(wheel).open("rb") as stream:
+        if hashlib.file_digest(stream,"sha256").hexdigest()!=wheel_hash:
+            raise ValueError("packaged wheel changed")
+    if json.loads(path.read_text(encoding="utf-8"))!=receipt:
+        raise ValueError("receipt changed")
+    print(json.dumps({"stage":"complete","id":id}),flush=True)
+    return receipt
+
 def main():
     p=argparse.ArgumentParser()
-    for k in ("python","wheel","root","profile"):
+    for k in ("wheel","root"):
         p.add_argument("--"+k,required=True)
+    p.add_argument("--python")
+    p.add_argument("--profile",choices=PROFILES)
+    p.add_argument("--recheck-id")
     p.add_argument("--approved",action="store_true")
     a=p.parse_args()
     try:
-        deploy(a.python,a.wheel,a.root,a.profile,approved=a.approved)
+        if a.recheck_id is not None:
+            if a.python is not None or a.profile is not None:
+                raise ValueError("recheck does not accept a Python or profile override")
+            recheck(a.wheel,a.root,a.recheck_id,approved=a.approved)
+        else:
+            if not a.python or not a.profile:
+                raise ValueError("deployment needs Python and profile")
+            deploy(a.python,a.wheel,a.root,a.profile,approved=a.approved)
     except (ValueError,OSError,subprocess.SubprocessError) as exc:
         print(json.dumps({"stage":"failed","error":type(exc).__name__}),flush=True)
         return 2
