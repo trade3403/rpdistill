@@ -177,11 +177,11 @@ async function startReview(args:string[]):Promise<ModelReply>{
  if(!win||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
  const mode=args[3];
  evaluationWorker.running=true;evaluationWorker.message="正在准备本地复核";
- if(mode==="rust"){
+ if(mode==="rust"||mode==="integration"){
   const exe=process.env.RPDISTILL_RUST_BRIDGE;
   if(!exe){evaluationWorker.running=false;return {ok:false,error:"请先在可信启动环境配置 RPDISTILL_RUST_BRIDGE"}}
   args.push("--executable",resolve(exe));
- }else{
+ }else if(mode==="blind"||mode==="collect"){
   try{
    const selected=await dialog.showOpenDialog(win,{properties:["openFile"],filters:[{name:mode==="blind"?"基线译文 JSONL":"独立评审 JSON",extensions:[mode==="blind"?"jsonl":"json"]}]});
    if(selected.canceled||selected.filePaths.length!==1){evaluationWorker.running=false;return {ok:false,error:"已取消文件选择"}}

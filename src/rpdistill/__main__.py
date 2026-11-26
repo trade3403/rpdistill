@@ -60,12 +60,16 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser("studio-snapshot")
     review=commands.add_parser("studio-review")
     review.add_argument("id")
-    review.add_argument("--kind",choices=["rust","blind","collect"],required=True)
+    review.add_argument("--kind",choices=["rust","blind","collect","integration","receipt-check"],required=True)
     for flag in ("evaluation-root","artifact-root","root"):
         review.add_argument("--"+flag,required=True)
     review.add_argument("--input")
     review.add_argument("--executable")
     review.add_argument("--timeout-seconds",type=int,default=180)
+    for flag in ("artifact-id","reviewed-dataset","reviewed-teacher-license","reviewed-model-license","rights-note","reviewer"):
+        review.add_argument("--"+flag)
+    review.add_argument("--max-seconds",type=int,default=3600)
+    review.add_argument("--training-limit",type=int,default=1000)
     review.add_argument("--approved",action="store_true")
     recover=commands.add_parser("studio-review-recover")
     recover.add_argument("id")
@@ -571,7 +575,10 @@ def main(argv=None) -> int:
             if args.assets:
                 result["verified_assets"]=str(checked_assets(args.assets))
         elif args.command == "studio-review":
-            result=run_review(args.db,args.id,args.kind,args.evaluation_root,args.artifact_root,args.root,input_path=args.input,executable=args.executable,timeout_seconds=args.timeout_seconds,approved=args.approved)
+            result=run_review(args.db,args.id,args.kind,args.evaluation_root,args.artifact_root,args.root,input_path=args.input,executable=args.executable,timeout_seconds=args.timeout_seconds,approved=args.approved,
+                artifact_id=args.artifact_id,reviewed_dataset=args.reviewed_dataset,reviewed_teacher_license=args.reviewed_teacher_license,
+                reviewed_model_license=args.reviewed_model_license,rights_note=args.rights_note,reviewer=args.reviewer,
+                max_seconds=args.max_seconds,training_limit=args.training_limit)
         elif args.command == "studio-review-recover":
             result=recover_review(args.db,args.id,worker_stopped=args.worker_stopped)
         elif args.command == "studio-artifact":

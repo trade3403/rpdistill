@@ -20,6 +20,8 @@ TABLES={"teachers":"teachers","modelscope_teachers":"modelscope_teachers",
 QUERIES={
     "reviews":"""SELECT id,source_id,kind,state,error,updated,
         json_extract(summary,'$.package_id') AS package_id,json_extract(summary,'$.parity_passed') AS parity_passed,
+        json_extract(summary,'$.receipt_id') AS receipt_id,json_extract(summary,'$.integration_passed') AS integration_passed,
+        json_extract(summary,'$.integrity_verified') AS integrity_verified,json_extract(summary,'$.artifact_id') AS artifact_id,
         json_extract(summary,'$.cached_tokens_per_second') AS cached_tokens_per_second,
         json_extract(summary,'$.full_tokens_per_second') AS full_tokens_per_second,
         json_extract(summary,'$.rss_bytes') AS rss_bytes,json_extract(summary,'$.packet_id') AS packet_id,

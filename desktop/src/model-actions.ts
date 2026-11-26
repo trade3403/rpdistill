@@ -9,6 +9,15 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "integration-run":
+  exact(["kind","id","artifact_id","reviewed_dataset","reviewed_teacher_license","reviewed_model_license","rights_note","reviewer","max_seconds","training_limit","approved"]);
+  const plain=(v:unknown,max:number):v is string=>typeof v==="string"&&!!v.trim()&&v.length<=max&&!/[\x00-\x1f\x7f]/.test(v);
+  if(!job(r.id)||!job(r.artifact_id)||typeof r.reviewed_dataset!=="string"||!/^[a-f0-9]{64}$/.test(r.reviewed_dataset)||!plain(r.reviewed_teacher_license,128)||!plain(r.reviewed_model_license,128)||!plain(r.rights_note,2000)||!plain(r.reviewer,128)||!integer(r.max_seconds,1,86400)||!integer(r.training_limit,1,10000)||r.approved!==true)throw Error("integration approval");
+  return ["studio-review",r.id,"--kind","integration","--artifact-id",r.artifact_id,"--reviewed-dataset",r.reviewed_dataset,"--reviewed-teacher-license="+r.reviewed_teacher_license,"--reviewed-model-license="+r.reviewed_model_license,"--rights-note="+r.rights_note,"--reviewer="+r.reviewer,"--max-seconds",String(r.max_seconds),"--training-limit",String(r.training_limit),"--approved"];
+ case "receipt-check":
+  exact(["kind","id","approved"]);
+  if(!job(r.id)||r.approved!==true)throw Error("receipt approval");
+  return ["studio-review",r.id,"--kind","receipt-check","--approved"];
  case "review-run":
   exact(["kind","id","mode","timeout_seconds","approved"]);
   if(!job(r.id)||typeof r.mode!=="string"||!["rust","blind","collect"].includes(r.mode)||!integer(r.timeout_seconds,1,900)||r.approved!==true)throw Error("review approval");

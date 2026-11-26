@@ -30,6 +30,8 @@ export type ModelRequest =
  | {kind:"training-enqueue";version:string;license:string;steps:number;batch_size:number;learning_rate:number;accumulation:number;device:string;precision:string;cuda_bytes:number;segment_steps:number;segment_seconds:number;total_seconds:number;checkpoint_bytes:number;total_checkpoint_bytes:number;approved:boolean}
  | {kind:"student-assets";approved:boolean}
  | {kind:"review-run";id:string;mode:"rust"|"blind"|"collect";timeout_seconds:number;approved:boolean}
+ | {kind:"integration-run";id:string;artifact_id:string;reviewed_dataset:string;reviewed_teacher_license:string;reviewed_model_license:string;rights_note:string;reviewer:string;max_seconds:number;training_limit:number;approved:boolean}
+ | {kind:"receipt-check";id:string;approved:boolean}
  | {kind:"review-recover";id:string;worker_stopped:boolean}
  | {kind:"artifact-run";id:string;mode:"fp32"|"fp16"|"int8"|"export";max_bytes:number;max_seconds:number;license_label:string;rights_note:string;approved:boolean}
  | {kind:"artifact-recover";id:string;worker_stopped:boolean}
