@@ -11,6 +11,7 @@ from .compression import create_candidate, plan, OVERHEAD
 from .compression_review import compare_candidates
 from .model_export import export_candidate, verify_package, REQUIRED_BYTES
 from .student_evaluation import GenerationConfig
+from .studio_chain_state import claim, reject_child_recovery
 
 def initialize(db):
     db.execute("""CREATE TABLE IF NOT EXISTS studio_artifacts (
@@ -55,7 +56,7 @@ def source(db_path,eval_id,eval_root):
     return job,checkpoint,benchmark,report
 
 def run_artifact(db_path,eval_id,mode,eval_root,root,*,max_bytes,max_seconds=3600,
-                 license_label="",rights_note="",approved=False):
+                 license_label="",rights_note="",approved=False,chain_id=None):
     if approved is not True or mode not in ("fp32","fp16","int8","export"):
         raise ValueError("explicit local candidate approval required")
     minimum=REQUIRED_BYTES if mode=="export" else plan(mode)["payload_bytes"]+OVERHEAD
@@ -74,11 +75,12 @@ def run_artifact(db_path,eval_id,mode,eval_root,root,*,max_bytes,max_seconds=360
     with closing(connect(db_path)) as db,db:
         db.execute("BEGIN IMMEDIATE")
         initialize(db)
-        for table in ("studio_artifacts","studio_evaluations","training_jobs","model_download_jobs","corpus_runs","studio_reviews"):
+        for table in ("studio_artifacts","studio_evaluations","training_jobs","model_download_jobs","corpus_runs","studio_reviews","studio_plans"):
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
                 if db.execute("SELECT 1 FROM "+table+" WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
                     raise ValueError("another persistent worker active or needs recovery")
         stamp=now()
+        claim(db,chain_id,"export" if mode=="export" else "compression",id,eval_id,stamp,mode=mode)
         db.execute("INSERT INTO studio_artifacts VALUES (?,?,?,'running',NULL,NULL,?,?)",(id,eval_id,mode,stamp,stamp))
     try:
         folder=root/id
@@ -122,6 +124,7 @@ def recover_artifact(db_path,id,*,worker_stopped=False):
     with closing(connect(db_path)) as db,db:
         db.execute("BEGIN IMMEDIATE")
         initialize(db)
+        reject_child_recovery(db,id,("compression_id","export_id"))
         if db.execute("UPDATE studio_artifacts SET state='interrupted',updated=? WHERE id=? AND state='running'",(now(),id)).rowcount!=1:
             raise ValueError("no active artifact task")
     return {"id":id,"state":"interrupted","release_ready":False}

@@ -88,7 +88,7 @@ def tick(path,id,*,approved=False,run=None,clock=None):
             return {"id":id,"state":"waiting","next_due":row["next_due"]}
         if row["claimed"]>=row["max_cycles"]:
             raise ValueError("cycle budget exhausted")
-        for table in ("studio_plans","corpus_runs","training_jobs","model_download_jobs","studio_evaluations","studio_artifacts","studio_reviews"):
+        for table in ("studio_plans","corpus_runs","training_jobs","model_download_jobs","studio_evaluations","studio_artifacts","studio_reviews","studio_chains"):
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone() and db.execute("SELECT 1 FROM "+table+" WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
                 raise ValueError("another persistent worker is active")
         spec=json.loads(row["spec"])

@@ -9,6 +9,17 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "chain-run":
+  exact(["kind","id","mode","review_note","compression_bytes","export_bytes","max_seconds","license_label","rights_note","approved"]);
+  if(!job(r.id)||(r.mode!=="fp16"&&r.mode!=="int8")||!integer(r.compression_bytes,1,2**40)||!integer(r.export_bytes,1,2**40)||!integer(r.max_seconds,1,86400)||r.approved!==true)throw Error("chain approval");
+  for(const [v,max] of [[r.review_note,2000],[r.license_label,128],[r.rights_note,2000]] as const){
+   if(typeof v!=="string"||!v.trim()||v.length>max||/[\x00-\x1f\x7f]/.test(v))throw Error("chain review");
+  }
+  return ["studio-chain",r.id,"--mode",r.mode,"--review-note="+r.review_note,"--compression-bytes",String(r.compression_bytes),"--export-bytes",String(r.export_bytes),"--max-seconds",String(r.max_seconds),"--license-label="+r.license_label,"--rights-note="+r.rights_note,"--approved"];
+ case "chain-recover":
+  exact(["kind","id","worker_stopped"]);
+  if(!job(r.id)||r.worker_stopped!==true)throw Error("chain recovery");
+  return ["studio-chain-recover",r.id,"--worker-stopped"];
  case "plan-create":
   exact(["kind","id","license","interval_minutes","max_cycles","total_bytes","approved"]);
   if(!job(r.id)||typeof r.license!=="string"||!r.license.trim()||r.license.length>100||/[\x00-\x1f\x7f]/.test(r.license)||!integer(r.interval_minutes,5,10080)||!integer(r.max_cycles,1,10)||!integer(r.total_bytes,1,2**40)||r.approved!==true)throw Error("plan approval");

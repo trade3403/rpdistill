@@ -16,8 +16,11 @@ SCHEMA="rpdistill-studio-snapshot-v1"
 TABLES={"teachers":"teachers","modelscope_teachers":"modelscope_teachers",
         "downloads":"model_download_jobs","papers":"papers","fulltexts":"paper_fulltexts",
         "segments":"corpus_segments","pairs":"corpus_pairs","datasets":"dataset_versions",
-        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations","artifacts":"studio_artifacts","reviews":"studio_reviews","plans":"studio_plans","plan_cycles":"studio_plan_cycles","training_links":"studio_training_links"}
+        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations","artifacts":"studio_artifacts","reviews":"studio_reviews","plans":"studio_plans","plan_cycles":"studio_plan_cycles","training_links":"studio_training_links","chains":"studio_chains"}
 QUERIES={
+    "chains":"""SELECT id,training_id,version,checkpoint_id,state,stage,evaluation_id,compression_id,export_id,error,updated,
+        json_extract(spec,'$.mode') AS mode,json_extract(spec,'$.compression_bytes') AS compression_bytes,
+        json_extract(spec,'$.export_bytes') AS export_bytes FROM studio_chains ORDER BY updated DESC,id LIMIT 50""",
     "training_links":"""SELECT version,run_id,job_id,license,substr(review_note,1,2000) AS review_note,created
         FROM studio_training_links ORDER BY created DESC,job_id LIMIT 50""",
     "plans":"""SELECT id,template_id,interval_minutes,max_cycles,claimed,state,active_run,next_due,error,updated,license,
@@ -125,7 +128,7 @@ def student_resources(assets,checkpoint_root):
 def snapshot(db_path):
     path=Path(db_path).expanduser().resolve()
     counts={key:0 for key in TABLES}
-    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,evaluation_active=0,artifact_active=0,review_active=0,plan_active=0)
+    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,evaluation_active=0,artifact_active=0,review_active=0,plan_active=0,chain_active=0)
     rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers","training_loss","training_events")}
     exists=path.exists()
     if exists:
@@ -185,6 +188,8 @@ def snapshot(db_path):
                 counts["review_active"]=db.execute("SELECT count(*) FROM studio_reviews WHERE state='running'").fetchone()[0]
             if TABLES["plans"] in available:
                 counts["plan_active"]=db.execute("SELECT count(*) FROM studio_plans WHERE state='running'").fetchone()[0]
+            if TABLES["chains"] in available:
+                counts["chain_active"]=db.execute("SELECT count(*) FROM studio_chains WHERE state='running'").fetchone()[0]
             for key,sql in QUERIES.items():
                 if TABLES[key] in available:
                     if key=="downloads":

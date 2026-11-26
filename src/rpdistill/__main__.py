@@ -39,6 +39,7 @@ from .export_review import review_integration, check_integration_receipt
 from .studio import snapshot as studio_snapshot
 from .studio_evaluation import evaluate_job, recover_evaluation
 from .studio_artifacts import run_artifact, recover_artifact
+from .studio_chains import run_chain,recover as chain_recover
 from .studio_reviews import run_review, recover_review
 
 
@@ -73,6 +74,17 @@ def parser() -> argparse.ArgumentParser:
     review.add_argument("--training-limit",type=int,default=1000)
     review.add_argument("--approved",action="store_true")
     recover=commands.add_parser("studio-review-recover")
+    recover.add_argument("id")
+    recover.add_argument("--worker-stopped",action="store_true")
+    chain=commands.add_parser("studio-chain")
+    chain.add_argument("id")
+    for flag in ("input","evaluation-root","artifact-root","review-note","license-label","rights-note"):
+        chain.add_argument("--"+flag,required=True)
+    chain.add_argument("--mode",choices=["fp16","int8"],required=True)
+    for flag in ("compression-bytes","export-bytes","max-seconds"):
+        chain.add_argument("--"+flag,type=int,required=True)
+    chain.add_argument("--approved",action="store_true")
+    recover=commands.add_parser("studio-chain-recover")
     recover.add_argument("id")
     recover.add_argument("--worker-stopped",action="store_true")
     artifact=commands.add_parser("studio-artifact")
@@ -596,6 +608,12 @@ def main(argv=None) -> int:
                 max_seconds=args.max_seconds,training_limit=args.training_limit)
         elif args.command == "studio-review-recover":
             result=recover_review(args.db,args.id,worker_stopped=args.worker_stopped)
+        elif args.command == "studio-chain":
+            result=run_chain(args.db,args.id,args.input,args.evaluation_root,args.artifact_root,review_note=args.review_note,
+                mode=args.mode,compression_bytes=args.compression_bytes,export_bytes=args.export_bytes,max_seconds=args.max_seconds,
+                license_label=args.license_label,rights_note=args.rights_note,approved=args.approved)
+        elif args.command == "studio-chain-recover":
+            result=chain_recover(args.db,args.id,worker_stopped=args.worker_stopped)
         elif args.command == "studio-artifact":
             result=run_artifact(args.db,args.id,args.mode,args.evaluation_root,args.root,max_bytes=args.max_bytes,max_seconds=args.max_seconds,license_label=args.license_label,rights_note=args.rights_note,approved=args.approved)
         elif args.command == "studio-artifact-recover":

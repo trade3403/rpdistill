@@ -126,7 +126,7 @@ def run_review(db_path,source_id,kind,eval_root,artifact_root,root,*,input_path=
     with closing(connect(db_path)) as db,db:
         db.execute("BEGIN IMMEDIATE")
         initialize(db)
-        for table in ("studio_reviews","studio_artifacts","studio_evaluations","training_jobs","model_download_jobs","corpus_runs"):
+        for table in ("studio_reviews","studio_artifacts","studio_evaluations","training_jobs","model_download_jobs","corpus_runs","studio_plans","studio_chains"):
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
                 if db.execute("SELECT 1 FROM "+table+" WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
                     raise ValueError("another persistent worker active or needs recovery")

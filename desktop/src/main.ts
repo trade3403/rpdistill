@@ -183,23 +183,26 @@ function workerAction(kind:string):ModelReply{
  return {ok:true,data:{...worker}};
 }
 let modelPending=false;
+let chainRunning=false;
 async function startEvaluation(args:string[]):Promise<ModelReply>{
  if(!win||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
- evaluationWorker.running=true;evaluationWorker.message="等待选择人工审核 JSONL";
+ const chain=args[0]==="studio-chain";
+ evaluationWorker.running=true;chainRunning=chain;evaluationWorker.message="等待选择人工审核 JSONL";
  let input:string;
  try{
   const selected=await dialog.showOpenDialog(win,{properties:["openFile"],filters:[{name:"人工参考译文 JSONL",extensions:["jsonl"]}]});
-  if(selected.canceled||selected.filePaths.length!==1){evaluationWorker.running=false;evaluationWorker.message="已取消文件选择";return {ok:false,error:"已取消文件选择"}}
+  if(selected.canceled||selected.filePaths.length!==1){evaluationWorker.running=false;chainRunning=false;evaluationWorker.message="已取消文件选择";return {ok:false,error:"已取消文件选择"}}
   input=selected.filePaths[0];
- }catch{evaluationWorker.running=false;return {ok:false,error:"文件选择失败"}}
- evaluationWorker.message="正在进行本地 CPU 学生模型评测";
- const child=spawn(python,["-I","-m","rpdistill","--db",db,...args,"--input",input,"--root",evaluationRoot],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+ }catch{evaluationWorker.running=false;chainRunning=false;return {ok:false,error:"文件选择失败"}}
+ evaluationWorker.message=chain?"执行后训练联动，以持久阶段为准":"正在进行本地 CPU 学生模型评测";
+ const roots=chain?["--evaluation-root",evaluationRoot,"--artifact-root",resolve(process.env.RPDISTILL_ARTIFACT_ROOT||join(homedir(),".rpdistill","artifacts"))]:["--root",evaluationRoot];
+ const child=spawn(python,["-I","-m","rpdistill","--db",db,...args,"--input",input,...roots],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
  const chunks:Buffer[]=[];let size=0,failed=false;
  child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else failed=true});
  child.stderr.resume();child.on("error",()=>{failed=true});
- child.on("close",code=>{evaluationWorker.running=false;
+ child.on("close",code=>{evaluationWorker.running=false;chainRunning=false;
   if(code!==0||failed){evaluationWorker.message="评测失败，请核对评测集、检查点和依赖";return}
-  try{const result=JSON.parse(Buffer.concat(chunks).toString("utf8"));evaluationWorker.message=result.state==="complete"?"评测报告已生成，非发布批准":"评测结果异常"}catch{evaluationWorker.message="评测响应异常"}
+  try{const result=JSON.parse(Buffer.concat(chunks).toString("utf8"));evaluationWorker.message=chain?(result.state==="complete"?"联动候选包完成，仍待人工集成验收":result.state==="stopped"?"质量门槛未通过，后续已停止":"联动结束，请核对持久状态"):result.state==="complete"?"评测报告已生成，非发布批准":"评测结果异常"}catch{evaluationWorker.message="评测响应异常"}
  });
  return {ok:true,data:{...evaluationWorker}};
 }
@@ -270,7 +273,7 @@ async function selectEnvironment(id:string):Promise<ModelReply>{
  try{
   // The bundled backend can inspect the DB even if the selected Python is broken.
   const state=await queryWith(basePython);
-  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active","plan_active"].some(k=>state.data.counts[k]>0))throw Error("active");
+  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active","plan_active","chain_active"].some(k=>state.data.counts[k]>0))throw Error("active");
   if(id==="base"){
    if(managed||existsSync(activeFile))await activateEnvironment(null);
    environmentWorker.message="已切换基础后端，训练环境仍保留";
@@ -305,7 +308,7 @@ async function startEnvironment(profile:string):Promise<ModelReply>{
  environmentWorker.running=true;environmentWorker.message="检查当前持久任务";
  try{
   const state=await query();
-  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active","plan_active"].some(k=>state.data.counts[k]>0))throw Error("active");
+  if(!state.ok||["download_active","pipeline_active","training_active","evaluation_active","artifact_active","review_active","plan_active","chain_active"].some(k=>state.data.counts[k]>0))throw Error("active");
   const wheel=wheelPath();
   const choice=await dialog.showOpenDialog(win,{title:"选择可信的 64 位 Python 3.11 或 3.12 python.exe",properties:["openFile"],filters:[{name:"Python executable",extensions:["exe"]}]});
   if(choice.canceled||choice.filePaths.length!==1){environmentWorker.running=false;environmentWorker.message="已取消";return {ok:false,error:"已取消选择"}}
@@ -404,6 +407,7 @@ async function exportReviewDataset(version:string):Promise<ModelReply>{
 function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
+ if(chainRunning)return Promise.resolve({ok:false,error:"后训练联动执行中，等待当前任务结束"});
  if(args[0]==="plan-stop")return Promise.resolve(stopPlan());
  if(planWorker.running)return Promise.resolve({ok:false,error:"请先停止周期计划，再操作其他任务"});
  if(args[0]==="plan-start"){if(degraded)return Promise.resolve({ok:false,error:"训练环境不可用"});return Promise.resolve(startPlan(args[1]));}
@@ -416,7 +420,8 @@ function modelAction(request:unknown):Promise<ModelReply>{
  if(args[0]==="studio-review-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地复核执行器仍运行"});
  if(args[0]==="studio-artifact")return Promise.resolve(startArtifact(args));
  if(args[0]==="studio-artifact-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地候选执行器仍运行"});
- if(args[0]==="studio-evaluate")return startEvaluation(args);
+ if(args[0]==="studio-chain"||args[0]==="studio-evaluate")return startEvaluation(args);
+ if(args[0]==="studio-chain-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地执行器仍运行"});
  if(args[0]==="studio-evaluation-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地评测执行器仍运行"});
  if(args[0]==="student-assets")return Promise.resolve(startAssets());
  if(args[0]==="dataset-review-export")return exportReviewDataset(args[1]);

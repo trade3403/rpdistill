@@ -46,6 +46,8 @@ export type ModelRequest =
  | {kind:"review-recover";id:string;worker_stopped:boolean}
  | {kind:"artifact-run";id:string;mode:"fp32"|"fp16"|"int8"|"export";max_bytes:number;max_seconds:number;license_label:string;rights_note:string;approved:boolean}
  | {kind:"artifact-recover";id:string;worker_stopped:boolean}
+ | {kind:"chain-run";id:string;mode:"fp16"|"int8";review_note:string;compression_bytes:number;export_bytes:number;max_seconds:number;license_label:string;rights_note:string;approved:boolean}
+ | {kind:"chain-recover";id:string;worker_stopped:boolean}
  | {kind:"evaluate-job";id:string;review_note:string;approved:boolean}
  | {kind:"evaluation-recover";id:string;worker_stopped:boolean}
  | {kind:"training-start";approved:boolean}

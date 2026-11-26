@@ -282,7 +282,7 @@ class TrainingQueue:
                 if not isinstance(job_id,str) or not re.fullmatch(r"[a-f0-9]{32}",job_id):
                     raise ValueError("invalid target training job")
                 available={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-                for table in ("corpus_runs","studio_plans","model_download_jobs","studio_evaluations","studio_artifacts","studio_reviews"):
+                for table in ("corpus_runs","studio_plans","model_download_jobs","studio_evaluations","studio_artifacts","studio_reviews","studio_chains"):
                     if table in available and db.execute("SELECT 1 FROM "+table+" WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
                         raise ValueError("another persistent worker active")
                 if "studio_training_links" not in available:

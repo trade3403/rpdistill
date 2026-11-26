@@ -8,6 +8,7 @@ from uuid import uuid4
 from .training_queue import TrainingQueue, now
 from .evaluation import freeze_benchmark, read_jsonl, read_json, write_new, hash_json
 from .student_evaluation import evaluate_checkpoint, GenerationConfig
+from .studio_chain_state import claim, reject_child_recovery
 
 def connect(db_path):
     db=sqlite3.connect(db_path,timeout=10)
@@ -21,7 +22,7 @@ def initialize(db):
         created TEXT NOT NULL,updated TEXT NOT NULL)""")
 
 def evaluate_job(db_path,training_id,input_path,root,review_note,*,approved=False,
-                 evaluate_fn=evaluate_checkpoint):
+                 evaluate_fn=evaluate_checkpoint,chain_id=None):
     if approved is not True or not re.fullmatch(r"[a-f0-9]{32}",training_id):
         raise ValueError("explicit evaluation approval required")
     job=TrainingQueue(db_path).get(training_id)
@@ -48,11 +49,12 @@ def evaluate_job(db_path,training_id,input_path,root,review_note,*,approved=Fals
         initialize(db)
         if db.execute("SELECT 1 FROM studio_evaluations WHERE state='running'").fetchone():
             raise ValueError("another evaluation is active or needs recovery")
-        for table in ("training_jobs","model_download_jobs","corpus_runs","studio_artifacts","studio_reviews"):
+        for table in ("training_jobs","model_download_jobs","corpus_runs","studio_artifacts","studio_reviews","studio_plans"):
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
                 if db.execute("SELECT 1 FROM "+table+" WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
                     raise ValueError("another persistent worker is active")
         stamp=now()
+        claim(db,chain_id,"evaluation",id,training_id,stamp)
         db.execute("INSERT INTO studio_evaluations VALUES (?,?,?,?,'running',NULL,NULL,?,?)",
                    (id,training_id,spec["version"],job["checkpoint_id"],stamp,stamp))
     try:
@@ -84,6 +86,7 @@ def recover_evaluation(db_path,id,*,worker_stopped=False):
     with closing(connect(db_path)) as db,db:
         db.execute("BEGIN IMMEDIATE")
         initialize(db)
+        reject_child_recovery(db,id,("evaluation_id",))
         if db.execute("UPDATE studio_evaluations SET state='interrupted',updated=? WHERE id=? AND state='running'",
                       (now(),id)).rowcount!=1:
             raise ValueError("no active evaluation record")
