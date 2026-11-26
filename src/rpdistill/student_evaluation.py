@@ -131,7 +131,27 @@ def generate_one(model,codec,source,config=GenerationConfig()):
 
 
 def peak_process_rss():
-    """Process lifetime high-water RSS on Linux/macOS, not model-only or GPU memory."""
+    """Lifetime peak resident memory, not model-only or GPU memory."""
+    if sys.platform=="win32":
+        import ctypes
+        from ctypes import wintypes
+        class Counters(ctypes.Structure):
+            _fields_=[("cb",wintypes.DWORD),("PageFaultCount",wintypes.DWORD)]+[
+                (name,ctypes.c_size_t) for name in ("PeakWorkingSetSize","WorkingSetSize",
+                "QuotaPeakPagedPoolUsage","QuotaPagedPoolUsage","QuotaPeakNonPagedPoolUsage",
+                "QuotaNonPagedPoolUsage","PagefileUsage","PeakPagefileUsage")]
+        kernel=ctypes.WinDLL("kernel32",use_last_error=True)
+        get_process=kernel.GetCurrentProcess
+        get_process.argtypes=[]
+        get_process.restype=wintypes.HANDLE
+        memory=ctypes.WinDLL("psapi",use_last_error=True).GetProcessMemoryInfo
+        memory.argtypes=[wintypes.HANDLE,ctypes.POINTER(Counters),wintypes.DWORD]
+        memory.restype=wintypes.BOOL
+        value=Counters()
+        value.cb=ctypes.sizeof(value)
+        if not memory(get_process(),ctypes.byref(value),value.cb):
+            return None
+        return int(value.PeakWorkingSetSize)
     if sys.platform not in ("linux","darwin"):
         return None
     import resource

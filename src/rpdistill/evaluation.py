@@ -303,14 +303,18 @@ def rate(n,d):
     return n/d if d else None
 
 
-def evaluate(db_path,benchmark,hypotheses,*,gate=QualityGate(),label="external hypotheses"):
+def score_cases(cases,hypotheses,*,gate=QualityGate()):
+    """Shared metric calculation only; not a frozen benchmark or release evidence."""
     import sacrebleu
     from sacrebleu.metrics import BLEU,CHRF
-    benchmark=validate_benchmark(db_path,benchmark)
+    if not isinstance(cases,list) or not 1<=len(cases)<=MAX_CASES:
+        raise ValueError("invalid case count")
+    cases=[clean_case(c) for c in cases]
+    if len({c["id"] for c in cases})!=len(cases) or len({norm(c["source"]) for c in cases})!=len(cases):
+        raise ValueError("duplicate diagnostic case")
     if not isinstance(gate,QualityGate):
         raise ValueError("invalid quality gate")
-    label=checked_text(label,"hypothesis label",256)
-    if not isinstance(hypotheses,list) or len(hypotheses)!=len(benchmark["cases"]):
+    if not isinstance(hypotheses,list) or len(hypotheses)!=len(cases):
         raise ValueError("hypothesis count must match benchmark exactly")
     by_id={}
     for row in hypotheses:
@@ -320,9 +324,8 @@ def evaluate(db_path,benchmark,hypotheses,*,gate=QualityGate(),label="external h
         if row["id"] in by_id or not isinstance(text,str) or len(text)>16000:
             raise ValueError("duplicate or invalid hypothesis")
         by_id[row["id"]]=text
-    if set(by_id)!={c["id"] for c in benchmark["cases"]}:
+    if set(by_id)!={c["id"] for c in cases}:
         raise ValueError("hypothesis IDs must match benchmark exactly")
-    cases=benchmark["cases"]
     outputs=[by_id[c["id"]] for c in cases]
     references=[c["reference"] for c in cases]
     bleu=BLEU(tokenize="zh",effective_order=True)
@@ -350,13 +353,18 @@ def evaluate(db_path,benchmark,hypotheses,*,gate=QualityGate(),label="external h
             failures.append("metric:"+key)
     if scores["suspicious"]>gate.max_suspicious:
         failures.append("metric:suspicious")
-    report={"schema":"rpdistill-evaluation-v1","benchmark_id":benchmark["benchmark_id"],
-            "training_dataset":benchmark["training_dataset"],"hypothesis_label":label,
-            "hypotheses_sha256":hash_json([{"id":c["id"],"hypothesis":by_id[c["id"]]} for c in cases]),
+    return {"hypotheses_sha256":hash_json([{"id":c["id"],"hypothesis":by_id[c["id"]]} for c in cases]),
             "metrics":scores,"coverage":coverage,"gate":asdict(gate),"failures":failures,
-            "automatic_gate_passed":not failures,"release_ready":False,
-            "model_output_authenticated":False,
+            "automatic_gate_passed":not failures,
             "metric_versions":{"sacrebleu":sacrebleu.__version__,"bleu":str(bleu.get_signature()),
                                "chrf":str(chrf.get_signature())},
             "details":details}
+
+def evaluate(db_path,benchmark,hypotheses,*,gate=QualityGate(),label="external hypotheses"):
+    benchmark=validate_benchmark(db_path,benchmark)
+    label=checked_text(label,"hypothesis label",256)
+    scores=score_cases(benchmark["cases"],hypotheses,gate=gate)
+    report={"schema":"rpdistill-evaluation-v1","benchmark_id":benchmark["benchmark_id"],
+            "training_dataset":benchmark["training_dataset"],"hypothesis_label":label,
+            **scores,"release_ready":False,"model_output_authenticated":False}
     return report|{"report_id":hash_json(report)}

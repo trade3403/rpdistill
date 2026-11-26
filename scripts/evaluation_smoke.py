@@ -58,3 +58,28 @@ with tempfile.TemporaryDirectory() as tmp:
                       "corrupted_metrics":bad["metrics"],"good_gate_pass":True,"bad_gate_rejected":True,
                       "insufficient_coverage_rejected":True,"training_overlap_rejected":True,
                       "tampered_snapshot_rejected":True,"model_quality_test":False}))
+
+# Diagnostic and frozen benchmark scoring share the identical metric core.
+from teacher_diagnostic_cases import cases,fixture_id
+from rpdistill.evaluation import score_cases
+diagnostic=cases()
+assert len(diagnostic)==24 and len({c["paper_id"] for c in diagnostic})==6
+assert fixture_id()==hashlib.sha256(encoded(diagnostic).encode()).hexdigest()
+identical=[{"id":r["id"],"hypothesis":r["reference"]} for r in diagnostic]
+scored=score_cases(diagnostic,identical)
+assert scored["metrics"]["bleu"]>99 and scored["metrics"]["chrf"]>99
+assert all(scored["metrics"][k]==1 for k in ("numeric","citations","terminology","protected"))
+assert not scored["automatic_gate_passed"] and "coverage:cases" in scored["failures"]
+assert "benchmark_id" not in scored and "training_dataset" not in scored
+for rows,outputs in ((diagnostic[:-1]+[diagnostic[0]],identical),
+                     (diagnostic,identical[:-1]+[identical[0]])):
+    try:
+        score_cases(rows,outputs)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("duplicate diagnostic identity accepted")
+from rpdistill.student_evaluation import peak_process_rss
+assert peak_process_rss()>0
+print(json.dumps({"diagnostic_cases":len(diagnostic),"shared_metric_core":True,
+                  "duplicate_rejected":True,"production_coverage_unchanged":True}))
