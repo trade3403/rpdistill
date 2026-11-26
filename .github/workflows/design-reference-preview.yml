@@ -8,6 +8,7 @@ on:
       - 'src/rpdistill/**'
       - 'tests/test_studio.py'
       - 'tests/test_studio_evaluation.py'
+      - 'tests/test_studio_artifacts.py'
       - 'scripts/studio_desktop_smoke.py'
       - 'scripts/studio_visual_compare.py'
       - 'scripts/studio_live_download_smoke.py'

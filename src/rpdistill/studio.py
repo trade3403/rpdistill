@@ -16,8 +16,13 @@ SCHEMA="rpdistill-studio-snapshot-v1"
 TABLES={"teachers":"teachers","modelscope_teachers":"modelscope_teachers",
         "downloads":"model_download_jobs","papers":"papers","fulltexts":"paper_fulltexts",
         "segments":"corpus_segments","pairs":"corpus_pairs","datasets":"dataset_versions",
-        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations"}
+        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations","artifacts":"studio_artifacts"}
 QUERIES={
+    "artifacts":"""SELECT id,evaluation_id,mode,state,error,updated,
+        json_extract(summary,'$.artifact_id') AS artifact_id,json_extract(summary,'$.bytes') AS bytes,
+        json_extract(summary,'$.verified') AS verified,json_extract(summary,'$.regression_passed') AS regression_passed,
+        json_extract(summary,'$.metric_delta.bleu') AS bleu_delta,json_extract(summary,'$.metric_delta.chrf') AS chrf_delta,
+        substr(json_extract(summary,'$.failures'),1,1000) AS failures FROM studio_artifacts ORDER BY updated DESC,id LIMIT 50""",
     "evaluations":"""SELECT id,training_id,version,checkpoint_id,state,updated,error,
         json_extract(summary,'$.report_id') AS report_id,json_extract(summary,'$.benchmark_id') AS benchmark_id,
         json_extract(summary,'$.metrics.bleu') AS bleu,json_extract(summary,'$.metrics.chrf') AS chrf,
@@ -96,7 +101,7 @@ def student_resources(assets,checkpoint_root):
 def snapshot(db_path):
     path=Path(db_path).expanduser().resolve()
     counts={key:0 for key in TABLES}
-    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,evaluation_active=0)
+    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,evaluation_active=0,artifact_active=0)
     rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers","training_loss","training_events")}
     exists=path.exists()
     if exists:
@@ -150,6 +155,8 @@ def snapshot(db_path):
                             rows["training_loss"]=samples
             if TABLES["evaluations"] in available:
                 counts["evaluation_active"]=db.execute("SELECT count(*) FROM studio_evaluations WHERE state='running'").fetchone()[0]
+            if TABLES["artifacts"] in available:
+                counts["artifact_active"]=db.execute("SELECT count(*) FROM studio_artifacts WHERE state='running'").fetchone()[0]
             for key,sql in QUERIES.items():
                 if TABLES[key] in available:
                     if key=="downloads":

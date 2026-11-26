@@ -6,6 +6,7 @@ import {CorpusCenter} from "./corpus-center";
 import {TrainingCenter,LossChart} from "./training-center";
 import {Dashboard,SideNav,TopBar,navigation,views} from "./dashboard";
 import {EvaluationCenter} from "./evaluation-center";
+import {ArtifactCenter} from "./artifact-center";
 const tabs=["工作台","模型与下载","科研语料","训练任务","评测与导出"];
 const stages=["论文发现","合法全文","语料分段","教师译文","候选数据集","学生训练","质量评测","模型导出"];
 const size=(n:unknown)=>typeof n==="number"?(n/1024**3).toFixed(2)+" GiB":"—";
@@ -107,7 +108,9 @@ function App(){
   const geometryOK=window.innerWidth===1672&&window.innerHeight===941&&[".studio-top",".studio-nav",".flow-panel",".studio-metrics",".studio-monitors",".studio-logs",".studio-config",".studio-footer"].every(selector=>{const element=document.querySelector(selector);if(!element)return false;const b=element.getBoundingClientRect();return b.width>0&&b.height>0&&b.left>=0&&b.top>=0&&b.right<=window.innerWidth+1&&b.bottom<=window.innerHeight+1});
   const deniedEval=await window.studio.modelAction({kind:"evaluate-job",id:"a".repeat(32),review_note:"fixture",approved:false});
   const injectedEval=await window.studio.modelAction({kind:"evaluate-job",id:"a".repeat(32),review_note:"fixture",approved:true,input:"C:/unexpected"} as any);
-  (window as any).studioSmoke(!deniedEval.ok&&!injectedEval.ok&&geometryOK&&assetsOK&&trainOK&&corpusOK&&ok&&!invalid.ok&&!unapproved.ok&&paused.ok&&p.ok&&p.data.rows.downloads[0]?.state==="paused"&&resumed.ok&&enqueued.ok&&queueOK&&removed&&!badStart.ok&&started.ok&&!duplicate.ok&&final.ok&&final.data.local_worker?.running===false&&final.data.local_worker.message==="没有待下载任务"&&final.data.counts.download_queued===0&&final.data.rows.downloads.every(r=>r.state==="cancelled"));
+  const deniedArtifact=await window.studio.modelAction({kind:"artifact-run",id:"a".repeat(32),mode:"int8",max_bytes:2**30,max_seconds:60,license_label:"",rights_note:"",approved:false});
+  const injectedArtifact=await window.studio.modelAction({kind:"artifact-run",id:"a".repeat(32),mode:"int8",max_bytes:2**30,max_seconds:60,license_label:"",rights_note:"",approved:true,root:"C:/unexpected"} as any);
+  (window as any).studioSmoke(!deniedArtifact.ok&&!injectedArtifact.ok&&!deniedEval.ok&&!injectedEval.ok&&geometryOK&&assetsOK&&trainOK&&corpusOK&&ok&&!invalid.ok&&!unapproved.ok&&paused.ok&&p.ok&&p.data.rows.downloads[0]?.state==="paused"&&resumed.ok&&enqueued.ok&&queueOK&&removed&&!badStart.ok&&started.ok&&!duplicate.ok&&final.ok&&final.data.local_worker?.running===false&&final.data.local_worker.message==="没有待下载任务"&&final.data.counts.download_queued===0&&final.data.rows.downloads.every(r=>r.state==="cancelled"));
  }catch{(window as any).studioSmoke(false)}})();
  }},[data]);
  if(tab===0)return <div className="studio-shell"><TopBar data={data} stale={!!error} refresh={refresh} busy={busy}/><SideNav nav={nav} onNavigate={setNav}/><Dashboard data={data} stale={!!error} refresh={refresh} onNavigate={setNav}/></div>;
@@ -124,7 +127,7 @@ function App(){
  {tab===1&&<section className="panel"><h2>已登记教师模型</h2><h3>Hugging Face</h3><Table rows={r?.teachers??[]} fields={[["model_id","模型"],["revision","固定版本"],["license","许可"]]}/><h3>ModelScope</h3><Table rows={r?.modelscope_teachers??[]} fields={[["model_id","模型"],["revision","固定版本"],["license","许可"]]}/></section>}
  {tab===2&&<><section className="metrics">{counts.slice(1).map(([label,n])=><article className="metric" key={String(label)}><span>{label}</span><strong>{value(n)}</strong></article>)}</section><CorpusCenter data={data} refresh={refresh} stale={!!error}/><section className="panel"><h2>论文目录 <small>最近 50 项 · 元数据非训练授权</small></h2><Table rows={r?.papers??[]} fields={[["pmcid","PMC ID"],["title","标题"],["publication_date","发表日期"],["eligibility","许可初筛"]]}/></section><section className="panel"><h2>候选数据集 <small>尚未授权训练</small></h2><Table rows={r?.datasets??[]} fields={[["version","版本 SHA"],["model_id","教师"],["train","训练"],["validation","验证"],["test","测试"],["status","状态"]]}/></section></>}
  {tab===6&&<section className="panel"><h2>设置与偏好</h2><p>当前使用本地 Python 与可信启动环境配置，图形化持久偏好尚未接入。</p></section>}
- {tab===4&&<EvaluationCenter data={data} refresh={refresh} stale={!!error}/> }
+ {tab===4&&(nav===6?<ArtifactCenter data={data} refresh={refresh} stale={!!error}/>:<EvaluationCenter data={data} refresh={refresh} stale={!!error}/>)}
  <section className="panel hardware"><h2>本地硬件</h2><div className="hardware-grid"><div><span>处理器</span><strong>{value(d?.logical_cpus)} 逻辑核心</strong><small>{d?.platform} {d?.architecture}</small></div><div><span>系统内存</span><strong>{size(d?.memory_bytes)}</strong></div><div><span>磁盘可用</span><strong>{size(d?.disk?.free_bytes)}</strong></div><div><span>NVIDIA GPU</span><strong>{d?.nvidia?.devices?.length??"—"} 张</strong><small>{d?.nvidia?.status??"未检测"}</small></div></div>{d?.nvidia?.devices?.map(g=><div className="gpu" key={g.index}>{g.name} · {g.free_mib} / {g.total_mib} MiB 空闲</div>)}<p className="muted">硬件识别不代表 CUDA 训练就绪。</p></section>
  <footer>RPDistill Studio {data?.version??""} · 模型、单次语料及训练队列控制 · 持续自动化待接入</footer>
  </main></div>

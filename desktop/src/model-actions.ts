@@ -9,6 +9,14 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "artifact-run":
+  exact(["kind","id","mode","max_bytes","max_seconds","license_label","rights_note","approved"]);
+  if(!job(r.id)||typeof r.mode!=="string"||!["fp32","fp16","int8","export"].includes(r.mode)||!integer(r.max_bytes,1,2**40)||!integer(r.max_seconds,1,86400)||typeof r.license_label!=="string"||r.license_label.length>128||typeof r.rights_note!=="string"||r.rights_note.length>2000||/[\x00-\x1f\x7f]/.test(r.license_label+r.rights_note)||(r.mode==="export"&&(!r.license_label.trim()||!r.rights_note.trim()))||r.approved!==true)throw Error("artifact approval");
+  return ["studio-artifact",r.id,"--mode",r.mode,"--max-bytes",String(r.max_bytes),"--max-seconds",String(r.max_seconds),"--license-label="+r.license_label,"--rights-note="+r.rights_note,"--approved"];
+ case "artifact-recover":
+  exact(["kind","id","worker_stopped"]);
+  if(!job(r.id)||r.worker_stopped!==true)throw Error("artifact recovery");
+  return ["studio-artifact-recover",r.id,"--worker-stopped"];
  case "evaluate-job":
   exact(["kind","id","review_note","approved"]);
   if(!job(r.id)||typeof r.review_note!=="string"||!r.review_note.trim()||r.review_note.length>2000||/[\x00-\x1f\x7f]/.test(r.review_note)||r.approved!==true)throw Error("evaluation approval");

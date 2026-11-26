@@ -71,3 +71,7 @@ E11c2 修复 fd79b35 标准 45741425689、Windows 专项 45741425763 success。�
 
 ## E11d1 跨平台评测测试路径修复（待 CI）
 ca1760b 标准 CI 45746734363 为6/10 success，四个 macOS/Windows Python 3.11/3.12 CPU矩阵全部在 test_persist_report_and_recovery 触发 checkpoint outside registered job root；已核查四份日志。训练队列登记 spec.root 时使用 Path.resolve()，实际 worker 从该规范路径构造 checkpoint；测试却直接从 TemporaryDirectory 原始路径构造，跨平台临时目录别名导致字面不等。修正测试从真实登记 spec.root 构造 checkpoint，保留生产路径安全检查和所有原断言，补充越界路径必须拒绝且不创建评测目录的回归；Windows 专项路径过滤加入新增测试，重新验收。原专项 45746734341 success；新提交 exact head 标准和专项全部通过后进入 E11d2，真实人工评测/GPU/像素级验收仍未完成。Windows GUI only，Europe PMC 暂缓，D线只读。
+
+
+## E11d2a 本地量化候选、回归及FP32导出（开发分支，待CI）
+前置8137f32标准45747939872、Windows专项45747939909 success。新增候选任务登记与只读摘要；仅接受默认自动门槛通过且身份匹配的本地评测、冻结集及已登记完整检查点。复用FP32/FP16/INT8存储转换、同源冻结集CPU FP32回归（200条、用户软时间预算），未通过回归仍保存研究记录但不选择；独立FP32本地候选包显式权利声明、预算、校验包ID和来源，非官方RPModel v1。固定可信输出目录、严格IPC及本地执行器互斥，显式异常恢复，不自动采用残留文件或发布。新单元测试覆盖预算/授权、异常状态、模拟回归记录，Windows smoke拒绝注入路径；真实转换及回归已有微型CPU专项，完整GUI真实质量通过模型及Rust兼容仍待验收。下一E11d2b Rust诊断/人工质量复核和发布门槛，再进入Windows安装包；先核验exact head CI。Windows GUI only，Europe PMC暂缓，D线只读。

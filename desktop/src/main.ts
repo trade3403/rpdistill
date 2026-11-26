@@ -159,10 +159,26 @@ async function startEvaluation(args:string[]):Promise<ModelReply>{
  });
  return {ok:true,data:{...evaluationWorker}};
 }
+function startArtifact(args:string[]):ModelReply{
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
+ evaluationWorker.running=true;evaluationWorker.message="正在构建或评测本地候选模型";
+ const root=resolve(process.env.RPDISTILL_ARTIFACT_ROOT||join(homedir(),".rpdistill","artifacts"));
+ const child=spawn(python,["-m","rpdistill","--db",db,...args,"--evaluation-root",evaluationRoot,"--root",root],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+ const chunks:Buffer[]=[];let size=0,failed=false;
+ child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else failed=true});
+ child.stderr.resume();child.on("error",()=>{failed=true});
+ child.on("close",code=>{evaluationWorker.running=false;
+  if(code!==0||failed){evaluationWorker.message="候选构建或回归失败，请核对预算及评测";return}
+  try{const result=JSON.parse(Buffer.concat(chunks).toString("utf8"));evaluationWorker.message=result.state==="complete"?"候选任务完成，非发布批准":"候选结果异常"}catch{evaluationWorker.message="候选响应异常"}
+ });
+ return {ok:true,data:{...evaluationWorker}};
+}
 function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
  if(args[0]==="worker-start"||args[0]==="worker-stop")return Promise.resolve(workerAction(args[0]));
+ if(args[0]==="studio-artifact")return Promise.resolve(startArtifact(args));
+ if(args[0]==="studio-artifact-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地候选执行器仍运行"});
  if(args[0]==="studio-evaluate")return startEvaluation(args);
  if(args[0]==="studio-evaluation-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地评测执行器仍运行"});
  if(args[0]==="student-assets")return Promise.resolve(startAssets());

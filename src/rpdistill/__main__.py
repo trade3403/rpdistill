@@ -37,6 +37,7 @@ from .projection_experiment import compare_projection
 from .export_review import review_integration, check_integration_receipt
 from .studio import snapshot as studio_snapshot
 from .studio_evaluation import evaluate_job, recover_evaluation
+from .studio_artifacts import run_artifact, recover_artifact
 
 
 def runtime_info() -> dict[str, str]:
@@ -56,6 +57,19 @@ def parser() -> argparse.ArgumentParser:
     commands = p.add_subparsers(dest="command")
     commands.add_parser("info")
     commands.add_parser("studio-snapshot")
+    artifact=commands.add_parser("studio-artifact")
+    artifact.add_argument("id")
+    artifact.add_argument("--mode",choices=["fp32","fp16","int8","export"],required=True)
+    for flag in ("evaluation-root","root"):
+        artifact.add_argument("--"+flag,required=True)
+    artifact.add_argument("--max-bytes",type=int,required=True)
+    artifact.add_argument("--max-seconds",type=int,default=3600)
+    artifact.add_argument("--license-label",default="")
+    artifact.add_argument("--rights-note",default="")
+    artifact.add_argument("--approved",action="store_true")
+    recover=commands.add_parser("studio-artifact-recover")
+    recover.add_argument("id")
+    recover.add_argument("--worker-stopped",action="store_true")
     studio_eval=commands.add_parser("studio-evaluate")
     studio_eval.add_argument("id")
     for flag in ("input","root","review-note"):
@@ -543,6 +557,10 @@ def main(argv=None) -> int:
             result=student_contract()
             if args.assets:
                 result["verified_assets"]=str(checked_assets(args.assets))
+        elif args.command == "studio-artifact":
+            result=run_artifact(args.db,args.id,args.mode,args.evaluation_root,args.root,max_bytes=args.max_bytes,max_seconds=args.max_seconds,license_label=args.license_label,rights_note=args.rights_note,approved=args.approved)
+        elif args.command == "studio-artifact-recover":
+            result=recover_artifact(args.db,args.id,worker_stopped=args.worker_stopped)
         elif args.command == "studio-evaluate":
             result=evaluate_job(args.db,args.id,args.input,args.root,args.review_note,approved=args.approved)
         elif args.command == "studio-evaluation-recover":
