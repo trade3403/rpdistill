@@ -16,8 +16,10 @@ SCHEMA="rpdistill-studio-snapshot-v1"
 TABLES={"teachers":"teachers","modelscope_teachers":"modelscope_teachers",
         "downloads":"model_download_jobs","papers":"papers","fulltexts":"paper_fulltexts",
         "segments":"corpus_segments","pairs":"corpus_pairs","datasets":"dataset_versions",
-        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations","artifacts":"studio_artifacts","reviews":"studio_reviews","plans":"studio_plans","plan_cycles":"studio_plan_cycles"}
+        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations","artifacts":"studio_artifacts","reviews":"studio_reviews","plans":"studio_plans","plan_cycles":"studio_plan_cycles","training_links":"studio_training_links"}
 QUERIES={
+    "training_links":"""SELECT version,run_id,job_id,license,substr(review_note,1,2000) AS review_note,created
+        FROM studio_training_links ORDER BY created DESC,job_id LIMIT 50""",
     "plans":"""SELECT id,template_id,interval_minutes,max_cycles,claimed,state,active_run,next_due,error,updated,license,
         json_extract(spec,'$.model_id') AS model_id,json_extract(spec,'$.revision') AS revision,
         json_extract(spec,'$.query.keywords[0]') AS keyword,json_extract(spec,'$.max_bytes') AS max_bytes

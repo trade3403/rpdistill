@@ -170,3 +170,45 @@ class DatasetTests(unittest.TestCase):
             db.execute("UPDATE dataset_members SET record=replace(record,'Research','Tampered') WHERE ordinal=0")
         with self.assertRaises(ValueError):
             snapshot_examples(self.db,manifest["version"],codec,split="train")
+
+    def test_linked_candidate_training_atomic_and_targeted(self):
+        from rpdistill.training_queue import TrainingQueue
+        self.populate()
+        TeacherRegistry(self.db).put(Teacher(MODEL,REV,"mit",False,False,None),self.root,[])
+        pipe=CorpusPipeline(self.db)
+        run=pipe.create(PaperQuery(("test",),"2025-01-01","2025-12-31",limit=3),MODEL,REV,OPTIONS,
+                        root=self.library.root,max_bytes=100000,gate=GATE,paper_limit=3)
+        with patch("rpdistill.pipeline.FulltextLibrary.download",return_value={"saved":0,"cached":3}):
+            done=pipe.run(run["id"],search=Mock(return_value={"inserted":0,"duplicate":3}),
+                          teacher_loader=Mock(return_value=self.translator()))
+        version=done["results"]["snapshot"]["version"]
+        q=TrainingQueue(self.db)
+        def enqueue(v=version,run_id=run["id"],note="review asserted"):
+            return q.enqueue(v,self.root/"assets",self.root/"checkpoints",reviewed_dataset=v,
+                reviewed_teacher_license="mit",total_seconds=300,total_checkpoint_bytes=2**30,
+                corpus_run=run_id,review_note=note)
+        unrelated=q.enqueue("b"*64,self.root/"assets",self.root/"checkpoints",reviewed_dataset="b"*64,
+                            reviewed_teacher_license="mit",total_seconds=300,total_checkpoint_bytes=2**30)
+        with self.assertRaises(ValueError):
+            enqueue(run_id="f"*32)
+        with self.assertRaises(ValueError):
+            enqueue(note="")
+        job=enqueue()
+        self.assertEqual(enqueue()["id"],job["id"])
+        with self.assertRaises(ValueError):
+            enqueue(note="different review")
+        with self.assertRaises(ValueError):
+            q.enqueue(version,self.root/"assets",self.root/"checkpoints",reviewed_dataset=version,
+                      reviewed_teacher_license="mit",total_seconds=300,total_checkpoint_bytes=2**30)
+        from rpdistill.studio import snapshot
+        links=snapshot(self.db)["rows"]["training_links"]
+        self.assertEqual((links[0]["run_id"],links[0]["job_id"],links[0]["version"]),(run["id"],job["id"],version))
+        with self.assertRaises(ValueError):
+            q.run_next(job_id=unrelated["id"])
+        with closing(sqlite3.connect(self.db)) as db,db:
+            db.execute("UPDATE dataset_members SET record='{}' WHERE version=? AND ordinal=0",(version,))
+        prepare=Mock(side_effect=AssertionError("must reject before preparation"))
+        failed=q.run_next(job_id=job["id"],prepare=prepare)
+        self.assertEqual(failed["state"],"failed")
+        prepare.assert_not_called()
+        self.assertEqual(q.get(unrelated["id"])["state"],"queued")

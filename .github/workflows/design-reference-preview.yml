@@ -12,6 +12,7 @@ on:
       - 'tests/test_studio_reviews.py'
       - 'tests/test_studio_environment.py'
       - 'tests/test_studio_plans.py'
+      - 'tests/test_datasets.py'
       - 'scripts/studio_desktop_smoke.py'
       - 'scripts/studio_prepare_windows_backend.py'
       - 'scripts/studio_installer_smoke.py'

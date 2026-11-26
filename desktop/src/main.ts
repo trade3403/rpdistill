@@ -109,10 +109,10 @@ function startAssets():ModelReply{
  });
  return {ok:true,data:{...assetWorker}};
 }
-function startTraining():ModelReply{
+function startTraining(id?:string):ModelReply{
  if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
- trainingWorker.running=true;trainingWorker.message="正在执行队列首个已授权训练任务";
- const child=spawn(python,["-I","-m","rpdistill","--db",db,"training-run"],{shell:false,windowsHide:true,
+ trainingWorker.running=true;trainingWorker.message=id?"正在执行指定已审核关联训练任务":"正在执行队列首个已授权训练任务";
+ const child=spawn(python,["-I","-m","rpdistill","--db",db,"training-run",...(id?["--job-id",id]:[])],{shell:false,windowsHide:true,
   stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8",CUBLAS_WORKSPACE_CONFIG:":4096:8"}});
  let size=0,failed=false;const chunks:Buffer[]=[];
  child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else failed=true});
@@ -380,6 +380,27 @@ function stopPlan():ModelReply{
  else planWorker.message="当前轮次结束后停止；不强制终止下载";
  return {ok:true,data:{...planWorker}};
 }
+async function exportReviewDataset(version:string):Promise<ModelReply>{
+ if(!win||modelPending||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||environmentWorker.running||planWorker.running)return {ok:false,error:"本地已有执行器或短操作"};
+ modelPending=true;
+ try{
+  const selected=await dialog.showSaveDialog(win,{title:"保存待人工审核的候选数据集（本地 JSONL）",defaultPath:"dataset-"+version.slice(0,12)+".jsonl",filters:[{name:"候选数据 JSONL",extensions:["jsonl"]}]});
+  if(selected.canceled||!selected.filePath){modelPending=false;return {ok:false,error:"已取消导出"}}
+  if(existsSync(selected.filePath)){modelPending=false;return {ok:false,error:"只允许新文件，请另选路径"}}
+  return await new Promise<ModelReply>(done=>{
+   const child=spawn(python,["-I","-m","rpdistill","--db",db,"dataset-export",version,"--output="+selected.filePath],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+   let size=0,failed=false;const chunks:Buffer[]=[];
+   const timer=setTimeout(()=>{failed=true;child.kill()},45000);
+   child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else{failed=true;child.kill()}});
+   child.stderr.resume();child.on("error",()=>{failed=true});
+   child.on("close",code=>{
+    clearTimeout(timer);modelPending=false;
+    if(code!==0||failed){done({ok:false,error:"数据导出失败，请核对候选完整性与输出文件"});return}
+    try{const r=JSON.parse(Buffer.concat(chunks).toString("utf8"));if(r.version!==version||r.training_ready!==false)throw Error("identity");done({ok:true,data:{version}})}catch{done({ok:false,error:"导出响应异常，请核对文件"})}
+   });
+  });
+ }catch{modelPending=false;return {ok:false,error:"无法导出审核文件"}}
+}
 function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
@@ -398,7 +419,8 @@ function modelAction(request:unknown):Promise<ModelReply>{
  if(args[0]==="studio-evaluate")return startEvaluation(args);
  if(args[0]==="studio-evaluation-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地评测执行器仍运行"});
  if(args[0]==="student-assets")return Promise.resolve(startAssets());
- if(args[0]==="training-run")return Promise.resolve(startTraining());
+ if(args[0]==="dataset-review-export")return exportReviewDataset(args[1]);
+ if(args[0]==="training-run")return Promise.resolve(startTraining(args[1]));
  if(args[0]==="training-recover"&&trainingWorker.running)return Promise.resolve({ok:false,error:"本地训练执行器仍运行"});
  if(args[0]==="training-enqueue")args.push("--assets",assets,"--root",checkpointRoot);
  if(args[0]==="pipeline-run")return Promise.resolve(startCorpus(args[1]));

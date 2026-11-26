@@ -68,8 +68,17 @@ export function modelArgs(value:unknown):string[]{
   exact(["kind","approved"]);
   if(r.approved!==true)throw Error("asset approval");
   return ["student-assets"];
- case "training-enqueue":
-  exact(["kind","version","license","steps","batch_size","learning_rate","accumulation","device","precision","cuda_bytes","segment_steps","segment_seconds","total_seconds","checkpoint_bytes","total_checkpoint_bytes","approved"]);
+ case "dataset-review-export":
+  exact(["kind","version","approved"]);
+  if(typeof r.version!=="string"||!/^[a-f0-9]{64}$/.test(r.version)||r.approved!==true)throw Error("review export approval");
+  return ["dataset-review-export",r.version];
+ case "training-start-linked":
+  exact(["kind","id","approved"]);
+  if(!job(r.id)||r.approved!==true)throw Error("linked training start");
+  return ["training-run",r.id];
+ case "training-enqueue":case "training-enqueue-linked":
+  exact(["kind","version","license","steps","batch_size","learning_rate","accumulation","device","precision","cuda_bytes","segment_steps","segment_seconds","total_seconds","checkpoint_bytes","total_checkpoint_bytes","approved",...(r.kind==="training-enqueue-linked"?["corpus_run","review_note"]:[])]);
+  if(r.kind==="training-enqueue-linked"&&(!job(r.corpus_run)||typeof r.review_note!=="string"||!r.review_note.trim()||r.review_note.length>2000||/[\x00-\x1f\x7f]/.test(r.review_note)))throw Error("linked review");
   if(typeof r.version!=="string"||!/^[a-f0-9]{64}$/.test(r.version)||
    typeof r.license!=="string"||!/^[A-Za-z0-9][A-Za-z0-9_.+-]{0,99}$/.test(r.license)||
    !integer(r.steps,1,10000)||!integer(r.batch_size,1,64)||!integer(r.accumulation,1,64)||
@@ -84,7 +93,7 @@ export function modelArgs(value:unknown):string[]{
    "--steps",String(r.steps),"--batch-size",String(r.batch_size),"--learning-rate",String(r.learning_rate),
    "--accumulation",String(r.accumulation),"--device",r.device,"--precision",r.precision,
    "--cuda-budget-bytes",String(r.cuda_bytes),"--segment-steps",String(r.segment_steps),"--segment-seconds",String(r.segment_seconds),
-   "--total-seconds",String(r.total_seconds),"--max-checkpoint-bytes",String(r.checkpoint_bytes),"--total-checkpoint-bytes",String(r.total_checkpoint_bytes)];
+   "--total-seconds",String(r.total_seconds),"--max-checkpoint-bytes",String(r.checkpoint_bytes),"--total-checkpoint-bytes",String(r.total_checkpoint_bytes),...(r.kind==="training-enqueue-linked"?["--corpus-run",String(r.corpus_run),"--review-note="+String(r.review_note)]:[])];
  case "training-start":
   exact(["kind","approved"]);
   if(r.approved!==true)throw Error("training start");

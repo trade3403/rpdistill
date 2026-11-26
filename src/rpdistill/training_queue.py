@@ -8,6 +8,7 @@ from contextlib import closing,contextmanager
 from dataclasses import asdict
 from datetime import datetime,timezone
 import json
+import hashlib
 import math
 from pathlib import Path
 import re
@@ -18,6 +19,7 @@ from .distill import DistillConfig,prepare_reviewed_snapshot
 from .resumable import ResumeConfig,required_bytes,run_segment,hash_json,SCHEMA,MANIFEST_LIMIT
 from .student import FIXED,StudentProfile
 from .transfer import digest_file
+from .datasets import encoded, sha
 
 ACTIVE=("running","pause_requested","cancel_requested")
 
@@ -62,6 +64,49 @@ def verified_checkpoint(path,profile,previous_step,target_steps):
         raise ValueError("checkpoint hash mismatch")
     return m,size+meta.stat().st_size
 
+
+def linked_candidate(db,run_id,version,license):
+    if not isinstance(run_id,str) or not re.fullmatch(r"[a-f0-9]{32}",run_id):
+        raise ValueError("invalid corpus run ID")
+    available={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if not {"corpus_runs","dataset_versions","dataset_members"}<=available:
+        raise ValueError("candidate corpus and dataset required")
+    run=db.execute("SELECT spec,state,stage,results FROM corpus_runs WHERE id=?",(run_id,)).fetchone()
+    if run is None or run["state"]!="candidate_complete" or run["stage"]!=5:
+        raise ValueError("completed candidate corpus required")
+    spec=json.loads(run["spec"])
+    result=json.loads(run["results"]).get("snapshot",{})
+    found=db.execute("SELECT manifest FROM dataset_versions WHERE version=?",(version,)).fetchone()
+    if found is None:
+        raise ValueError("unknown dataset version")
+    m=json.loads(found[0])
+    teacher={k:spec[k] for k in ("source","model_id","revision")}
+    if (result.get("version")!=version or result.get("status")!="candidate_snapshot" or
+        {k:v for k,v in result.items() if k!="reused"}!=m or m.get("version")!=version or
+        sha(encoded({k:v for k,v in m.items() if k!="version"}).encode())!=version or
+        m.get("status")!="candidate_snapshot" or m.get("training_ready") is not False or
+        m.get("teacher")!=teacher or m.get("options")!=spec["options"] or m.get("gate")!=spec["gate"]):
+        raise ValueError("candidate identity mismatch")
+    digest=hashlib.sha256()
+    count=0
+    for row in db.execute("SELECT ordinal,record FROM dataset_members WHERE version=? ORDER BY ordinal",(version,)):
+        if row["ordinal"]!=count:
+            raise ValueError("candidate ordinal mismatch")
+        digest.update((row["record"]+"\n").encode("ascii"))
+        count+=1
+    if count!=m["count"] or digest.hexdigest()!=m["payload_sha256"]:
+        raise ValueError("candidate payload integrity mismatch")
+    if teacher["source"] not in ("huggingface","modelscope"):
+        raise ValueError("invalid teacher source")
+    table="teachers" if teacher["source"]=="huggingface" else "modelscope_teachers"
+    if table not in available:
+        raise ValueError("teacher registry unavailable")
+    registered=db.execute("SELECT record FROM "+table+" WHERE model_id=? AND revision=?",
+        (teacher["model_id"],teacher["revision"])).fetchone()
+    record=json.loads(registered[0]) if registered else {}
+    if record.get("license")!=license or record.get("gated") or record.get("private"):
+        raise ValueError("teacher license or access changed")
+    return m
 
 class TrainingQueue:
     def __init__(self,db_path):
@@ -127,7 +172,7 @@ class TrainingQueue:
 
     def enqueue(self,version,assets,root,*,reviewed_dataset,reviewed_teacher_license,
                 config=ResumeConfig(),limit=1000,segment_steps=20,segment_seconds=300,
-                total_seconds,max_checkpoint_bytes=2**30,total_checkpoint_bytes):
+                total_seconds,max_checkpoint_bytes=2**30,total_checkpoint_bytes,corpus_run=None,review_note=None):
         if not isinstance(config,ResumeConfig):
             raise ValueError("invalid config")
         if not isinstance(version,str) or not re.fullmatch(r"[a-f0-9]{64}",version) or reviewed_dataset!=version:
@@ -146,8 +191,32 @@ class TrainingQueue:
                   config=asdict(config),limit=limit,segment_steps=segment_steps,segment_seconds=segment_seconds,
                   total_seconds=total_seconds,max_checkpoint_bytes=max_checkpoint_bytes,
                   total_checkpoint_bytes=total_checkpoint_bytes)
+        if (corpus_run is None)!=(review_note is None):
+            raise ValueError("linked corpus and review note required together")
+        if corpus_run is not None:
+            if not isinstance(review_note,str) or not review_note.strip() or len(review_note)>2000 or any(ord(c)<32 or ord(c)==127 for c in review_note):
+                raise ValueError("explicit content and rights review note required")
+            spec["corpus_run"]=corpus_run
+            spec["review_note"]=review_note
         raw=json.dumps(spec,sort_keys=True,allow_nan=False)
         with self.write() as db:
+            db.execute("""CREATE TABLE IF NOT EXISTS studio_training_links (
+                version TEXT PRIMARY KEY,run_id TEXT NOT NULL,job_id TEXT NOT NULL UNIQUE,
+                license TEXT NOT NULL,review_note TEXT NOT NULL,created TEXT NOT NULL)""")
+            link=db.execute("SELECT job_id FROM studio_training_links WHERE version=?",(version,)).fetchone()
+            if corpus_run is not None:
+                manifest=linked_candidate(db,corpus_run,version,reviewed_teacher_license)
+                if limit<manifest["gate"]["min_train"]:
+                    raise ValueError("training selection cannot meet candidate minimum")
+                if link:
+                    job=self._get(db,link[0])
+                    if job["spec"]==spec:
+                        return job
+                    raise ValueError("dataset already linked to a training job")
+                if db.execute("SELECT 1 FROM training_jobs WHERE json_extract(spec,'$.version')=? LIMIT 1",(version,)).fetchone():
+                    raise ValueError("dataset already has a training job")
+            elif link:
+                raise ValueError("dataset already linked to a training job")
             existing=db.execute("""SELECT id FROM training_jobs WHERE spec=? AND
                 state IN ('queued','running','pause_requested','cancel_requested','paused','failed','interrupted')""",(raw,)).fetchone()
             if existing:
@@ -155,6 +224,8 @@ class TrainingQueue:
             id=uuid4().hex
             stamp=now()
             db.execute("INSERT INTO training_jobs(id,spec,state,created,updated) VALUES (?,?,'queued',?,?)",(id,raw,stamp,stamp))
+            if corpus_run is not None:
+                db.execute("INSERT INTO studio_training_links VALUES (?,?,?,?,?,?)",(version,corpus_run,id,reviewed_teacher_license,review_note,stamp))
             self.event(db,id,"queued")
             return self._get(db,id)
 
@@ -202,14 +273,28 @@ class TrainingQueue:
             db.execute("INSERT INTO training_step_metrics VALUES (?,?,?,?,?,?,0,?)",
                        (id,attempt,step,loss,seconds,tokens,now()))
 
-    def run_next(self,*,prepare=prepare_reviewed_snapshot,execute=run_segment,profile=FIXED,max_segments=1000):
+    def run_next(self,*,prepare=prepare_reviewed_snapshot,execute=run_segment,profile=FIXED,max_segments=1000,job_id=None):
         bounded(max_segments,1,1000,"worker segment limit")
         with self.write() as db:
             if db.execute("SELECT 1 FROM training_jobs WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
                 raise ValueError("another training worker owns the queue")
-            row=db.execute("SELECT id FROM training_jobs WHERE state='queued' ORDER BY created,id LIMIT 1").fetchone()
-            if row is None:
-                return None
+            if job_id is not None:
+                if not isinstance(job_id,str) or not re.fullmatch(r"[a-f0-9]{32}",job_id):
+                    raise ValueError("invalid target training job")
+                available={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                for table in ("corpus_runs","studio_plans","model_download_jobs","studio_evaluations","studio_artifacts","studio_reviews"):
+                    if table in available and db.execute("SELECT 1 FROM "+table+" WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
+                        raise ValueError("another persistent worker active")
+                if "studio_training_links" not in available:
+                    raise ValueError("linked job required")
+                row=db.execute("""SELECT j.id FROM training_jobs j JOIN studio_training_links l ON j.id=l.job_id
+                    WHERE j.state='queued' AND j.id=?""",(job_id,)).fetchone()
+                if row is None:
+                    raise ValueError("target linked training job not queued")
+            else:
+                row=db.execute("SELECT id FROM training_jobs WHERE state='queued' ORDER BY created,id LIMIT 1").fetchone()
+                if row is None:
+                    return None
             id=row[0]
             self.state(db,id,"running")
         for _ in range(max_segments):
@@ -234,6 +319,10 @@ class TrainingQueue:
                     reserved_bytes=reserved_bytes+?,updated=? WHERE id=?""",(attempt,seconds,size,now(),id))
                 self.event(db,id,"running",attempt=attempt,reserved_seconds=seconds,reserved_bytes=size)
             try:
+                if spec.get("corpus_run") is not None:
+                    with closing(self.connect()) as db:
+                        db.execute("BEGIN")
+                        linked_candidate(db,spec["corpus_run"],spec["version"],spec["reviewed_teacher_license"])
                 config=read_config(spec)
                 root=Path(spec["root"])/id
                 if root.is_symlink():

@@ -30,7 +30,9 @@ export type ModelRequest =
  | {kind:"pipeline-create";source:ModelSource;model_id:string;revision:string;keyword:string;start_date:string;end_date:string;device:string;dtype:string;search_limit:number;paper_limit:number;segment_limit:number;max_bytes:number;approved:boolean}
  | {kind:"pipeline-run";id:string;approved:boolean}
  | {kind:"pipeline-resume";id:string;worker_stopped:boolean}
- | {kind:"training-enqueue";version:string;license:string;steps:number;batch_size:number;learning_rate:number;accumulation:number;device:string;precision:string;cuda_bytes:number;segment_steps:number;segment_seconds:number;total_seconds:number;checkpoint_bytes:number;total_checkpoint_bytes:number;approved:boolean}
+ | {kind:"dataset-review-export";version:string;approved:boolean}
+ | {kind:"training-start-linked";id:string;approved:boolean}
+ | {kind:"training-enqueue"|"training-enqueue-linked";corpus_run?:string;review_note?:string;version:string;license:string;steps:number;batch_size:number;learning_rate:number;accumulation:number;device:string;precision:string;cuda_bytes:number;segment_steps:number;segment_seconds:number;total_seconds:number;checkpoint_bytes:number;total_checkpoint_bytes:number;approved:boolean}
  | {kind:"plan-create";id:string;license:string;interval_minutes:number;max_cycles:number;total_bytes:number;approved:boolean}
  | {kind:"plan-start"|"plan-cancel";id:string;approved:boolean}
  | {kind:"plan-stop"}

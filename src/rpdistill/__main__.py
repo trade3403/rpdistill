@@ -287,6 +287,8 @@ def parser() -> argparse.ArgumentParser:
     resume_train.add_argument("--max-checkpoint-bytes",type=int,default=1073741824)
     queue_train = commands.add_parser("training-enqueue")
     queue_train.add_argument("version")
+    queue_train.add_argument("--corpus-run")
+    queue_train.add_argument("--review-note")
     queue_train.add_argument("--assets",required=True)
     queue_train.add_argument("--root",required=True)
     queue_train.add_argument("--reviewed-dataset",required=True,
@@ -313,6 +315,7 @@ def parser() -> argparse.ArgumentParser:
     queue_train.add_argument("--total-checkpoint-bytes",type=int,required=True)
     qrun=commands.add_parser("training-run")
     qrun.add_argument("--max-segments",type=int,default=1000)
+    qrun.add_argument("--job-id")
     qlist=commands.add_parser("training-list")
     qlist.add_argument("--limit",type=int,default=100)
     for action in ("show","events","pause","resume","cancel","recover"):
@@ -542,12 +545,13 @@ def main(argv=None) -> int:
                 reviewed_dataset=args.reviewed_dataset,reviewed_teacher_license=args.reviewed_teacher_license,
                 config=config,limit=args.limit,segment_steps=args.segment_steps,
                 segment_seconds=args.segment_seconds,total_seconds=args.total_seconds,
-                max_checkpoint_bytes=args.max_checkpoint_bytes,total_checkpoint_bytes=args.total_checkpoint_bytes)
+                max_checkpoint_bytes=args.max_checkpoint_bytes,total_checkpoint_bytes=args.total_checkpoint_bytes,
+                corpus_run=args.corpus_run,review_note=args.review_note)
         elif args.command.startswith("training-"):
             queue=TrainingQueue(args.db)
             action=args.command.removeprefix("training-")
             if action=="run":
-                result=queue.run_next(max_segments=args.max_segments)
+                result=queue.run_next(max_segments=args.max_segments,job_id=args.job_id)
             elif action=="list":
                 result=queue.list(args.limit)
             elif action=="show":
