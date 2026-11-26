@@ -9,6 +9,14 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "review-run":
+  exact(["kind","id","mode","timeout_seconds","approved"]);
+  if(!job(r.id)||typeof r.mode!=="string"||!["rust","blind","collect"].includes(r.mode)||!integer(r.timeout_seconds,1,900)||r.approved!==true)throw Error("review approval");
+  return ["studio-review",r.id,"--kind",r.mode,"--timeout-seconds",String(r.timeout_seconds),"--approved"];
+ case "review-recover":
+  exact(["kind","id","worker_stopped"]);
+  if(!job(r.id)||r.worker_stopped!==true)throw Error("review recovery");
+  return ["studio-review-recover",r.id,"--worker-stopped"];
  case "artifact-run":
   exact(["kind","id","mode","max_bytes","max_seconds","license_label","rights_note","approved"]);
   if(!job(r.id)||typeof r.mode!=="string"||!["fp32","fp16","int8","export"].includes(r.mode)||!integer(r.max_bytes,1,2**40)||!integer(r.max_seconds,1,86400)||typeof r.license_label!=="string"||r.license_label.length>128||typeof r.rights_note!=="string"||r.rights_note.length>2000||/[\x00-\x1f\x7f]/.test(r.license_label+r.rights_note)||(r.mode==="export"&&(!r.license_label.trim()||!r.rights_note.trim()))||r.approved!==true)throw Error("artifact approval");

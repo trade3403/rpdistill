@@ -173,10 +173,40 @@ function startArtifact(args:string[]):ModelReply{
  });
  return {ok:true,data:{...evaluationWorker}};
 }
+async function startReview(args:string[]):Promise<ModelReply>{
+ if(!win||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
+ const mode=args[3];
+ evaluationWorker.running=true;evaluationWorker.message="正在准备本地复核";
+ if(mode==="rust"){
+  const exe=process.env.RPDISTILL_RUST_BRIDGE;
+  if(!exe){evaluationWorker.running=false;return {ok:false,error:"请先在可信启动环境配置 RPDISTILL_RUST_BRIDGE"}}
+  args.push("--executable",resolve(exe));
+ }else{
+  try{
+   const selected=await dialog.showOpenDialog(win,{properties:["openFile"],filters:[{name:mode==="blind"?"基线译文 JSONL":"独立评审 JSON",extensions:[mode==="blind"?"jsonl":"json"]}]});
+   if(selected.canceled||selected.filePaths.length!==1){evaluationWorker.running=false;return {ok:false,error:"已取消文件选择"}}
+   args.push("--input",selected.filePaths[0]);
+  }catch{evaluationWorker.running=false;return {ok:false,error:"文件选择失败"}}
+ }
+ const root=resolve(process.env.RPDISTILL_REVIEW_ROOT||join(homedir(),".rpdistill","reviews"));
+ const artifactRoot=resolve(process.env.RPDISTILL_ARTIFACT_ROOT||join(homedir(),".rpdistill","artifacts"));
+ evaluationWorker.message="正在进行本地诊断或人工复核";
+ const child=spawn(python,["-m","rpdistill","--db",db,...args,"--evaluation-root",evaluationRoot,"--artifact-root",artifactRoot,"--root",root],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+ const chunks:Buffer[]=[];let size=0,failed=false;
+ child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else failed=true});
+ child.stderr.resume();child.on("error",()=>{failed=true});
+ child.on("close",code=>{evaluationWorker.running=false;
+  if(code!==0||failed){evaluationWorker.message="诊断或复核失败，请检查输入和可信桥接程序";return}
+  try{const result=JSON.parse(Buffer.concat(chunks).toString("utf8"));evaluationWorker.message=result.state==="complete"?"本地复核记录已生成，非发布批准":"复核响应异常"}catch{evaluationWorker.message="复核响应异常"}
+ });
+ return {ok:true,data:{...evaluationWorker}};
+}
 function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
  if(args[0]==="worker-start"||args[0]==="worker-stop")return Promise.resolve(workerAction(args[0]));
+ if(args[0]==="studio-review")return startReview(args);
+ if(args[0]==="studio-review-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地复核执行器仍运行"});
  if(args[0]==="studio-artifact")return Promise.resolve(startArtifact(args));
  if(args[0]==="studio-artifact-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地候选执行器仍运行"});
  if(args[0]==="studio-evaluate")return startEvaluation(args);

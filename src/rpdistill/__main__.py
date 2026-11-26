@@ -38,6 +38,7 @@ from .export_review import review_integration, check_integration_receipt
 from .studio import snapshot as studio_snapshot
 from .studio_evaluation import evaluate_job, recover_evaluation
 from .studio_artifacts import run_artifact, recover_artifact
+from .studio_reviews import run_review, recover_review
 
 
 def runtime_info() -> dict[str, str]:
@@ -57,6 +58,18 @@ def parser() -> argparse.ArgumentParser:
     commands = p.add_subparsers(dest="command")
     commands.add_parser("info")
     commands.add_parser("studio-snapshot")
+    review=commands.add_parser("studio-review")
+    review.add_argument("id")
+    review.add_argument("--kind",choices=["rust","blind","collect"],required=True)
+    for flag in ("evaluation-root","artifact-root","root"):
+        review.add_argument("--"+flag,required=True)
+    review.add_argument("--input")
+    review.add_argument("--executable")
+    review.add_argument("--timeout-seconds",type=int,default=180)
+    review.add_argument("--approved",action="store_true")
+    recover=commands.add_parser("studio-review-recover")
+    recover.add_argument("id")
+    recover.add_argument("--worker-stopped",action="store_true")
     artifact=commands.add_parser("studio-artifact")
     artifact.add_argument("id")
     artifact.add_argument("--mode",choices=["fp32","fp16","int8","export"],required=True)
@@ -557,6 +570,10 @@ def main(argv=None) -> int:
             result=student_contract()
             if args.assets:
                 result["verified_assets"]=str(checked_assets(args.assets))
+        elif args.command == "studio-review":
+            result=run_review(args.db,args.id,args.kind,args.evaluation_root,args.artifact_root,args.root,input_path=args.input,executable=args.executable,timeout_seconds=args.timeout_seconds,approved=args.approved)
+        elif args.command == "studio-review-recover":
+            result=recover_review(args.db,args.id,worker_stopped=args.worker_stopped)
         elif args.command == "studio-artifact":
             result=run_artifact(args.db,args.id,args.mode,args.evaluation_root,args.root,max_bytes=args.max_bytes,max_seconds=args.max_seconds,license_label=args.license_label,rights_note=args.rights_note,approved=args.approved)
         elif args.command == "studio-artifact-recover":

@@ -48,7 +48,7 @@ def evaluate_job(db_path,training_id,input_path,root,review_note,*,approved=Fals
         initialize(db)
         if db.execute("SELECT 1 FROM studio_evaluations WHERE state='running'").fetchone():
             raise ValueError("another evaluation is active or needs recovery")
-        for table in ("training_jobs","model_download_jobs","corpus_runs","studio_artifacts"):
+        for table in ("training_jobs","model_download_jobs","corpus_runs","studio_artifacts","studio_reviews"):
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
                 if db.execute("SELECT 1 FROM "+table+" WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
                     raise ValueError("another persistent worker is active")

@@ -74,7 +74,7 @@ def run_artifact(db_path,eval_id,mode,eval_root,root,*,max_bytes,max_seconds=360
     with closing(connect(db_path)) as db,db:
         db.execute("BEGIN IMMEDIATE")
         initialize(db)
-        for table in ("studio_artifacts","studio_evaluations","training_jobs","model_download_jobs","corpus_runs"):
+        for table in ("studio_artifacts","studio_evaluations","training_jobs","model_download_jobs","corpus_runs","studio_reviews"):
             if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
                 if db.execute("SELECT 1 FROM "+table+" WHERE state IN ('running','pause_requested','cancel_requested') LIMIT 1").fetchone():
                     raise ValueError("another persistent worker active or needs recovery")
