@@ -52,7 +52,7 @@ function App(){
  const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(""),[tab,setTab]=useState(0),[busy,setBusy]=useState(false);
  async function refresh(){setBusy(true);try{const r=await window.studio.snapshot();if(r.ok){setData(r.data);setError("")}else setError(r.error)}
  catch{setError("无法连接桌面后端")}finally{setBusy(false)}}
- useEffect(()=>{void refresh();const id=setInterval(()=>void refresh(),10000);return()=>clearInterval(id)},[]);
+ useEffect(()=>{void refresh();const id=setInterval(()=>void refresh(),tab===1?3000:10000);return()=>clearInterval(id)},[tab]);
  const c=data?.counts,r=data?.rows,d=data?.devices;
  const counts=[["登记教师模型",c?c.teachers+c.modelscope_teachers:undefined],["科研论文",c?.papers],["已存全文",c?.fulltexts],["语料分段",c?.segments],["双语候选",c?.pairs],["数据集版本",c?.datasets]];
  const smokeStarted=React.useRef(false);
@@ -67,7 +67,15 @@ function App(){
   const resumed=await window.studio.modelAction({kind:"resume",id});
   const enqueued=await window.studio.modelAction({kind:"enqueue",source:"huggingface",model_id:"fixture/second",revision:"b".repeat(40),license:"apache-2.0",max_bytes:1024,reviewed:true});
   const q=await window.studio.snapshot();
-  (window as any).studioSmoke(ok&&!invalid.ok&&!unapproved.ok&&paused.ok&&p.ok&&p.data.rows.downloads[0]?.state==="paused"&&resumed.ok&&enqueued.ok&&q.ok&&q.data.counts.downloads===2&&q.data.rows.downloads.every(r=>r.state==="queued"));
+  const queueOK=q.ok&&q.data.counts.downloads===2&&q.data.rows.downloads.every(r=>r.state==="queued");
+  // Offline smoke: cancel fixtures, run actual empty CLI queue in a native child.
+  const removed=q.ok?await Promise.all([]).then(async()=>{for(const row of q.data.rows.downloads){const result=await window.studio.modelAction({kind:"cancel",id:String(row.id)});if(!result.ok)return false}return true}):false;
+  const badStart=await window.studio.modelAction({kind:"worker-start",unexpected:true} as any);
+  const started=await window.studio.modelAction({kind:"worker-start"});
+  const duplicate=await window.studio.modelAction({kind:"worker-start"});
+  let final=await window.studio.snapshot();
+  for(let i=0;i<30&&final.ok&&final.data.local_worker?.running;i++){await new Promise(resolve=>setTimeout(resolve,250));final=await window.studio.snapshot()}
+  (window as any).studioSmoke(ok&&!invalid.ok&&!unapproved.ok&&paused.ok&&p.ok&&p.data.rows.downloads[0]?.state==="paused"&&resumed.ok&&enqueued.ok&&queueOK&&removed&&!badStart.ok&&started.ok&&!duplicate.ok&&final.ok&&final.data.local_worker?.running===false&&final.data.local_worker.message==="没有待下载任务"&&final.data.counts.download_queued===0&&final.data.rows.downloads.every(r=>r.state==="cancelled"));
  }catch{(window as any).studioSmoke(false)}})();
  }},[data]);
  return <div className={tab===0?"shell dashboard-shell":"shell"}><aside><div className="brand"><span className="logo">RP</span><div>RPDistill<span>STUDIO · 知识蒸馏</span></div></div>
@@ -80,7 +88,7 @@ function App(){
  <section className="metrics">{counts.map(([label,n])=><article className="metric" key={String(label)}><span>{label}</span><strong>{value(n)}</strong><small>本地数据库记录</small></article>)}</section>
  <section className="panel"><h2>自动化阶段流水线</h2><div className="pipeline">{stages.map((s,i)=><div key={s}><b>{String(i+1).padStart(2,"0")}</b><span>{s}</span></div>)}</div><p className="muted">流程示意，不表示当前任务已完成；任务状态见下方。</p></section><MonitorPanels data={data}/></>}
  {(tab===0||tab===3)&&<section className="panel"><h2>训练任务 <small>{value(c?.training)} 项</small></h2><Table rows={r?.training??[]} fields={[["id","任务 ID"],["state","状态"],["step","优化器步数"],["attempt","执行次数"],["updated","更新时间"]]}/><p className="muted">实时 loss、GPU 利用率曲线尚未接入，不显示模拟数据。</p></section>}
- {tab===1&&<ModelCenter rows={r?.downloads??[]} refresh={refresh}/>}
+ {tab===1&&<ModelCenter rows={r?.downloads??[]} refresh={refresh} worker={data?.local_worker} queued={c?.download_queued} active={c?.download_active} stale={!!error}/>}
  {tab===0&&<section className="panel"><h2>模型下载 <small>{value(c?.downloads)} 项</small></h2><Table rows={r?.downloads??[]} fields={[["model_id","模型"],["state","状态"],["done_bytes","已完成字节"],["total_bytes","总字节"],["rate","记录速率"],["eta","预计剩余秒"]]}/></section>}
  {tab===1&&<section className="panel"><h2>已登记教师模型</h2><h3>Hugging Face</h3><Table rows={r?.teachers??[]} fields={[["model_id","模型"],["revision","固定版本"],["license","许可"]]}/><h3>ModelScope</h3><Table rows={r?.modelscope_teachers??[]} fields={[["model_id","模型"],["revision","固定版本"],["license","许可"]]}/></section>}
  {tab===2&&<><section className="metrics">{counts.slice(1).map(([label,n])=><article className="metric" key={String(label)}><span>{label}</span><strong>{value(n)}</strong></article>)}</section><section className="panel"><h2>语料流水线任务</h2><Table rows={r?.pipelines??[]} fields={[["id","任务 ID"],["state","状态"],["stage","阶段"],["updated","更新时间"]]}/></section></>}

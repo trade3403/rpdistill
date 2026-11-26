@@ -21,6 +21,9 @@ export function modelArgs(value:unknown):string[]{
    typeof r.license!=="string"||!/^[A-Za-z0-9][A-Za-z0-9_.+-]{0,99}$/.test(r.license)||
    typeof r.max_bytes!=="number"||!Number.isSafeInteger(r.max_bytes)||r.max_bytes<=0||r.reviewed!==true)throw Error("approval");
   return ["download-enqueue",r.model_id,"--source",r.source,"--revision",r.revision,"--reviewed-license",r.license,"--max-bytes",String(r.max_bytes)];
+ case "worker-start":case "worker-stop":
+  exact(["kind"]);
+  return [r.kind];
  case "pause":case "resume":case "cancel":
   exact(["kind","id"]);
   if(typeof r.id!=="string"||!/^[a-f0-9]{32}$/.test(r.id))throw Error("job");

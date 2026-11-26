@@ -14,7 +14,9 @@ TABLES={"teachers":"teachers","modelscope_teachers":"modelscope_teachers",
         "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks"}
 QUERIES={
     "downloads":"""SELECT id,substr(json_extract(spec,'$.model_id'),1,200) AS model_id,
-        state,done_bytes,total_bytes,rate,eta,substr(error,1,200) AS error,updated
+        coalesce(json_extract(spec,'$.source'),'huggingface') AS source,
+        state,done_bytes,total_bytes,rate,eta,{network_bytes} AS network_bytes,
+        {network_rate} AS network_rate,substr(error,1,200) AS error,updated
         FROM model_download_jobs ORDER BY updated DESC,id LIMIT 50""",
     "training":"""SELECT id,state,step,attempt,reserved_seconds,reserved_bytes,
         substr(error,1,200) AS error,updated FROM training_jobs ORDER BY updated DESC,id LIMIT 50""",
@@ -29,6 +31,7 @@ TEACHER_SQL="""SELECT substr(model_id,1,200) AS model_id,revision,
 def snapshot(db_path):
     path=Path(db_path).expanduser().resolve()
     counts={key:0 for key in TABLES}
+    counts.update(download_queued=0,download_active=0)
     rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers")}
     exists=path.exists()
     if exists:
@@ -44,8 +47,14 @@ def snapshot(db_path):
             for key,table in TABLES.items():
                 if table in available:
                     counts[key]=db.execute("SELECT count(*) FROM "+table).fetchone()[0]
+            if TABLES["downloads"] in available:
+                counts["download_queued"]=db.execute("SELECT count(*) FROM model_download_jobs WHERE state='queued'").fetchone()[0]
+                counts["download_active"]=db.execute("SELECT count(*) FROM model_download_jobs WHERE state IN ('running','pause_requested','cancel_requested')").fetchone()[0]
             for key,sql in QUERIES.items():
                 if TABLES[key] in available:
+                    if key=="downloads":
+                        columns={row[1] for row in db.execute("PRAGMA table_info(model_download_jobs)")}
+                        sql=sql.format(**{name:name if name in columns else "NULL" for name in ("network_bytes","network_rate")})
                     rows[key]=[dict(r) for r in db.execute(sql)]
             for key in ("teachers","modelscope_teachers"):
                 if TABLES[key] in available:

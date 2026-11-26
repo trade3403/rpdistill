@@ -1,9 +1,9 @@
-import {app,BrowserWindow,ipcMain,session} from "electron";
+import {app,BrowserWindow,ipcMain,session,dialog} from "electron";
 import {spawn} from "node:child_process";
 import {join,resolve} from "node:path";
 import {homedir} from "node:os";
 import {pathToFileURL} from "node:url";
-import {SCHEMA,type Reply,type Snapshot,type ModelReply} from "./protocol";
+import {SCHEMA,type Reply,type Snapshot,type ModelReply,type WorkerStatus} from "./protocol";
 import {modelArgs} from "./model-actions";
 const smoke=process.argv.includes("--studio-smoke");
 const page=join(__dirname,"index.html");
@@ -38,10 +38,49 @@ function query():Promise<Reply>{
   }).finally(()=>{pending=undefined});
   return pending;
 }
+// Only explicitly started, approved persistent jobs run. A worker never kills an active
+// download on pause/stop: cooperative checkpoints and DB state remain authoritative.
+const worker:WorkerStatus={running:false,stop_requested:false,message:"下载执行器未启动"};
+function finishWorker(message:string){
+ worker.running=false;worker.stop_requested=false;worker.message=message;
+}
+function nextDownload(){
+ if(worker.stop_requested){finishWorker("执行器已停止接收新任务");return}
+ worker.message="正在执行队列中的任务";
+ const child=spawn(python,["-m","rpdistill","--db",db,"download-run"],{
+  shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+ const chunks:Buffer[]=[];let size=0,failed=false;
+ child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else failed=true});
+ child.stderr.resume();
+ child.on("error",()=>{failed=true});
+ child.on("close",code=>{
+  if(code!==0||failed){finishWorker("执行器异常退出或其他执行器占用队列；请核对任务状态");return}
+  try{
+   const result=JSON.parse(Buffer.concat(chunks).toString("utf8")) as {state?:string}|null;
+   if(result===null){finishWorker("没有待下载任务");return}
+   if(result.state!=="succeeded"){finishWorker("本轮在非成功任务后停止，请检查队列");return}
+   if(worker.stop_requested){finishWorker("当前任务已结束，执行器已停止");return}
+   // Yield to IPC between jobs; the SQLite queue enforces cross-process ownership.
+   setImmediate(nextDownload);
+  }catch{finishWorker("执行器响应无效，请核对任务状态")}
+ });
+}
+function workerAction(kind:string):ModelReply{
+ if(kind==="worker-start"){
+  if(worker.running)return {ok:false,error:"本地下载执行器已运行"};
+  worker.running=true;worker.stop_requested=false;worker.message="正在启动执行器";
+  setImmediate(nextDownload);
+  return {ok:true,data:{...worker}};
+ }
+ if(!worker.running)return {ok:false,error:"本地下载执行器未运行"};
+ worker.stop_requested=true;worker.message="当前任务结束后停止；可使用任务暂停或取消";
+ return {ok:true,data:{...worker}};
+}
 let modelPending=false;
 function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
+ if(args[0]==="worker-start"||args[0]==="worker-stop")return Promise.resolve(workerAction(args[0]));
  if(modelPending)return Promise.resolve({ok:false,error:"已有模型操作正在执行"});
  modelPending=true;
  return new Promise<ModelReply>(done=>{
@@ -70,6 +109,9 @@ function create(){
   win.webContents.setWindowOpenHandler(()=>({action:"deny"}));
   win.webContents.on("will-navigate",(e,url)=>{if(url!==allowedURL)e.preventDefault()});
   win.webContents.on("will-attach-webview",e=>e.preventDefault());
+  win.on("close",event=>{
+    if(worker.running){event.preventDefault();dialog.showMessageBoxSync(win!,{type:"info",title:"下载执行器仍在运行",message:"请先暂停或取消当前任务，或等待当前任务结束，再关闭窗口。"});}
+  });
   win.on("closed",()=>{win=null});
   void win.loadFile(page);
 }
@@ -79,7 +121,8 @@ app.whenReady().then(()=>{
   ipcMain.handle("studio:snapshot",async(event)=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
        event.senderFrame!==win.webContents.mainFrame)return {ok:false,error:"请求来源无效"} satisfies Reply;
-    return query();
+    const reply=await query();
+    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker}}}:reply;
   });
   ipcMain.handle("studio:model-action",(event,request:unknown)=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
@@ -92,9 +135,10 @@ app.whenReady().then(()=>{
         console.log("studio_smoke="+String(value===true));app.exit(value===true?0:1);
       }
     });
-    setTimeout(()=>app.exit(1),60000).unref();
+    setTimeout(()=>app.exit(1),90000).unref();
   }
   create();
   app.on("activate",()=>{if(!win)create()});
 });
+app.on("before-quit",event=>{if(worker.running){event.preventDefault();if(win)dialog.showMessageBoxSync(win,{type:"info",message:"下载执行器仍在运行，请先结束当前任务。"});}});
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit()});

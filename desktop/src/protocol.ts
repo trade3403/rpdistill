@@ -1,6 +1,8 @@
 export const SCHEMA = "rpdistill-studio-snapshot-v1";
 export interface Row { [key:string]: string | number | null }
+export interface WorkerStatus {running:boolean;stop_requested:boolean;message:string}
 export interface Snapshot {
+  local_worker?:WorkerStatus;
   schema: typeof SCHEMA; version:string; observed_at:string; database_exists:boolean;
   counts:Record<string,number>; rows:Record<string,Row[]>;
   devices:{platform:string;architecture:string;logical_cpus:number|null;memory_bytes:number|null;
@@ -13,7 +15,8 @@ export type ModelRequest =
  | {kind:"search";source:ModelSource;query:string}
  | {kind:"revisions";model_id:string}
  | {kind:"enqueue";source:ModelSource;model_id:string;revision:string;license:string;max_bytes:number;reviewed:boolean}
- | {kind:"pause"|"resume"|"cancel";id:string};
+ | {kind:"pause"|"resume"|"cancel";id:string}
+ | {kind:"worker-start"|"worker-stop"};
 export type ModelReply={ok:true;data:unknown}|{ok:false;error:string};
 export interface StudioAPI {snapshot:()=>Promise<Reply>;modelAction:(request:ModelRequest)=>Promise<ModelReply>}
 declare global {interface Window {studio:StudioAPI}}
