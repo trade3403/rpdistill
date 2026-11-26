@@ -41,10 +41,10 @@ function MonitorPanels({data}:{data:Snapshot|null}){
  const errors=[...(data?.rows.downloads??[]),...(data?.rows.pipelines??[]),...(data?.rows.training??[])].filter(r=>r.error);
  return <>
   <section className="monitor-grid">
-   <article className="panel loss-panel"><div className="panel-heading"><h2>训练 Loss 曲线</h2><small>检查点采样</small></div>
+   <article className="panel loss-panel"><div className="panel-heading"><h2>训练 Loss 曲线</h2><small>优化器步采样</small></div>
    <LossChart data={data}/></article>
    <article className="panel gpu-panel"><div className="panel-heading"><h2>GPU 监控</h2><small>真实硬件快照</small></div>
-   {d?.nvidia?.devices?.length?d.nvidia.devices.map(g=><div className="gpu-card" key={g.index}><b>{g.name}</b><small>显存已用 {g.total_mib-g.free_mib} / {g.total_mib} MiB</small>{g.total_mib>0&&g.free_mib>=0&&g.free_mib<=g.total_mib&&<meter min={0} max={g.total_mib} value={g.total_mib-g.free_mib}/>}<small>GPU 利用率：未接入</small></div>):<div className="empty">尚无 NVIDIA GPU 记录 · {d?.nvidia?.status??"未取得快照"}</div>}
+   {d?.nvidia?.devices?.length?d.nvidia.devices.map(g=><div className="gpu-card" key={g.index}><b>{g.name}</b><small>显存已用 {g.total_mib-g.free_mib} / {g.total_mib} MiB</small>{g.total_mib>0&&g.free_mib>=0&&g.free_mib<=g.total_mib&&<meter min={0} max={g.total_mib} value={g.total_mib-g.free_mib}/>}<small>GPU 利用率：{g.utilization_percent==null?"—":g.utilization_percent+"%"} · 温度：{g.temperature_c==null?"—":g.temperature_c+" °C"} · 功耗：{g.power_w==null?"—":g.power_w+" W"}</small></div>):<div className="empty">尚无 NVIDIA GPU 记录 · {d?.nvidia?.status??"未取得快照"}</div>}
    <div className="monitor-hardware"><span>CPU <b>{value(d?.logical_cpus)} 核</b></span><span>内存 <b>{size(d?.memory_bytes)}</b></span></div></article>
   </section>
   <section className="panel log-panel"><div className="panel-heading"><h2>任务日志</h2><small>最近任务错误摘要</small></div>{errors.length?<Table rows={errors} fields={[["updated","更新时间"],["id","任务 ID"],["error","错误摘要"]]}/>:<div className="log-empty">暂无已读取的任务错误 · 实时事件流尚未接入</div>}</section>
@@ -54,7 +54,7 @@ function App(){
  const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(""),[tab,setTab]=useState(0),[busy,setBusy]=useState(false);
  async function refresh(){setBusy(true);try{const r=await window.studio.snapshot();if(r.ok){setData(r.data);setError("")}else setError(r.error)}
  catch{setError("无法连接桌面后端")}finally{setBusy(false)}}
- useEffect(()=>{void refresh();const id=setInterval(()=>void refresh(),(tab===1||tab===2||tab===3)?3000:10000);return()=>clearInterval(id)},[tab]);
+ useEffect(()=>{void refresh();const id=setInterval(()=>void refresh(),tab===4?10000:3000);return()=>clearInterval(id)},[tab]);
  const c=data?.counts,r=data?.rows,d=data?.devices;
  const counts=[["登记教师模型",c?c.teachers+c.modelscope_teachers:undefined],["科研论文",c?.papers],["已存全文",c?.fulltexts],["语料分段",c?.segments],["双语候选",c?.pairs],["数据集版本",c?.datasets]];
  const smokeStarted=React.useRef(false);
@@ -103,7 +103,7 @@ function App(){
  }},[data]);
  return <div className={tab===0?"shell dashboard-shell":"shell"}><aside><div className="brand"><span className="logo">RP</span><div>RPDistill<span>STUDIO · 知识蒸馏</span></div></div>
  <div className="navlabel">工作空间</div>{tabs.map((t,i)=><button className={tab===i?"nav active":"nav"} onClick={()=>setTab(i)} key={t}><span>{["◈","▣","▤","◉","◇"][i]}</span>{t}</button>)}
- <div className="aside-bottom">本地工作空间<br/><small>本地工作台 · E11c2</small></div></aside>
+ <div className="aside-bottom">本地工作空间<br/><small>本地工作台 · E11c3a</small></div></aside>
  <main><header><div><div className="eyebrow">RPTRANSLATE / 自主模型训练</div><h1>{tabs[tab]}</h1></div><div className="header-actions"><span className={error?"status bad":"status"}>{error?"连接异常":data?"本地后端已连接":"正在连接"}</span><button className="refresh" onClick={()=>void refresh()} disabled={busy}>{busy?"刷新中…":"刷新状态"}</button></div></header>
  {error&&<div role="alert" className="error">{error}；现有数据显示为上次成功快照。</div>}
  <div className="subline">本地真实记录 · {data?.observed_at?new Date(data.observed_at).toLocaleString():"尚未取得快照"}{data&&!data.database_exists?" · 尚无任务数据库":""}</div>
@@ -111,7 +111,7 @@ function App(){
  <section className="metrics">{counts.map(([label,n])=><article className="metric" key={String(label)}><span>{label}</span><strong>{value(n)}</strong><small>本地数据库记录</small></article>)}</section>
  <section className="panel"><h2>自动化阶段流水线</h2><div className="pipeline">{stages.map((s,i)=><div key={s}><b>{String(i+1).padStart(2,"0")}</b><span>{s}</span></div>)}</div><p className="muted">流程示意，不表示当前任务已完成；任务状态见下方。</p></section><MonitorPanels data={data}/></>}
  {tab===3&&<TrainingCenter data={data} refresh={refresh} stale={!!error}/>}
- {tab===0&&<section className="panel"><h2>训练任务 <small>{value(c?.training)} 项</small></h2><Table rows={r?.training??[]} fields={[["id","任务 ID"],["state","状态"],["step","优化器步数"],["attempt","执行次数"],["updated","更新时间"]]}/><p className="muted">Loss 来自已提交检查点；逐步实时遥测、GPU 利用率尚未接入。</p></section>}
+ {tab===0&&<section className="panel"><h2>训练任务 <small>{value(c?.training)} 项</small></h2><Table rows={r?.training??[]} fields={[["id","任务 ID"],["state","状态"],["step","优化器步数"],["attempt","执行次数"],["updated","更新时间"]]}/><p className="muted">Loss 来自真实优化器更新；黄色点尚未保存为检查点，不代表可恢复进度。</p></section>}
  {tab===1&&<ModelCenter rows={r?.downloads??[]} refresh={refresh} worker={data?.local_worker} queued={c?.download_queued} active={c?.download_active} stale={!!error}/>}
  {tab===0&&<section className="panel"><h2>模型下载 <small>{value(c?.downloads)} 项</small></h2><Table rows={r?.downloads??[]} fields={[["model_id","模型"],["state","状态"],["done_bytes","已完成字节"],["total_bytes","总字节"],["rate","记录速率"],["eta","预计剩余秒"]]}/></section>}
  {tab===1&&<section className="panel"><h2>已登记教师模型</h2><h3>Hugging Face</h3><Table rows={r?.teachers??[]} fields={[["model_id","模型"],["revision","固定版本"],["license","许可"]]}/><h3>ModelScope</h3><Table rows={r?.modelscope_teachers??[]} fields={[["model_id","模型"],["revision","固定版本"],["license","许可"]]}/></section>}

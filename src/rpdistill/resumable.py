@@ -292,7 +292,7 @@ def restore(root,profile,config,examples,provenance,device=None):
 
 def run_segment(examples,destination,*,config=ResumeConfig(),profile=FIXED,provenance,
                 resume=None,run_steps=100,max_seconds=3600,max_checkpoint_bytes=2**30,
-                should_stop=None):
+                should_stop=None,on_step=None):
     """Train a bounded segment, atomically publish a complete state at a step boundary."""
     import torch
     if not isinstance(config,ResumeConfig) or not isinstance(profile,StudentProfile):
@@ -342,6 +342,7 @@ def run_segment(examples,destination,*,config=ResumeConfig(),profile=FIXED,prove
             reason="segment_steps"
             groups=epoch_groups(examples,profile,config,epoch)
             while len(history)<end:
+                step_started=time.monotonic()
                 group=groups[cursor]
                 total_tokens=sum(sum(i!=-100 for row in b["labels"] for i in row) for b in group)
                 opt.zero_grad(set_to_none=True)
@@ -372,6 +373,8 @@ def run_segment(examples,destination,*,config=ResumeConfig(),profile=FIXED,prove
                     opt.step()
                 history.append({"step":len(history)+1,"epoch":epoch+1,"loss":weighted/total_tokens,
                     "gradient_norm":float(grad),"supervised_tokens":total_tokens,"microbatches":len(group)})
+                if on_step is not None:
+                    on_step(dict(history[-1]),max(time.monotonic()-step_started,1e-6))
                 cursor+=1
                 if cursor==len(groups):
                     epoch+=1

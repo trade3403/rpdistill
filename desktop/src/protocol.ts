@@ -9,7 +9,7 @@ export interface Snapshot {
   schema: typeof SCHEMA; version:string; observed_at:string; database_exists:boolean;
   counts:Record<string,number>; rows:Record<string,Row[]>;
   devices:{platform:string;architecture:string;logical_cpus:number|null;memory_bytes:number|null;
-    disk:{free_bytes:number;total_bytes:number};nvidia:{status:string;devices:{index:number;name:string;total_mib:number;free_mib:number}[]}};
+    disk:{free_bytes:number;total_bytes:number};nvidia:{status:string;devices:{index:number;name:string;total_mib:number;free_mib:number;utilization_percent?:number|null;temperature_c?:number|null;power_w?:number|null}[]}};
   read_only:true;training_metrics_available:boolean;release_ready:false;
 }
 export type Reply = {ok:true;data:Snapshot}|{ok:false;error:string};

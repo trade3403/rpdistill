@@ -43,6 +43,11 @@ with tempfile.TemporaryDirectory() as tmp:
     b=load_file(str(root/"full"/"training.safetensors"))
     assert a.keys()==b.keys() and all(torch.equal(a[k],b[k]) for k in a)
     assert len(list((root/"states"/job["id"]).glob("attempt-*")))==3
+    from rpdistill.studio import snapshot
+    samples=snapshot(q.path)["rows"]["training_loss"]
+    assert [v["step"] for v in samples]==[1,2,3,4,5]
+    assert all(v["committed"]==1 and v["seconds"]>0 and v["tokens"]>0 for v in samples)
+    assert [v["loss"] for v in samples]==[v["loss"] for v in full["history"]]
     print(json.dumps({"steps":done["step"],"checkpoint_count":done["attempt"],
         "equal_state_tensors":len(a),"pause_restart_resume":True,"budget_reservations":True,
         "fixture":"synthetic CPU targets","quality_test":False}))

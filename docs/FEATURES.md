@@ -113,3 +113,7 @@ E11b2 修复 26ec3cd 的标准 CI 45736731767 与 Windows 专项 45736731818 suc
 
 ## E11c2 训练中心第一轮（开发分支，待 CI）
 E11c1 d9f6076 标准 45739368042、专项 45739368036 success。新增固定 Marian 学生的 GUI 训练队列：精确候选版本与许可复核声明、优化器步数、批大小、学习率、累积、CPU/CUDA/精度、时间与检查点及显存软预算，固定可信启动环境资产/检查点目录（学生资产仍须 CLI student-assets 预备），创建与运行单独确认。GUI 显式启动一个 FIFO 任务，暂停/恢复/取消/人工确认异常恢复，保留 SQLite 单 worker、已验证 checkpoint、保守预算、后端每段重新核验数据与权利。本地下载/语料/训练执行器互斥、退出保护，不是系统全局锁。训练事件从已验证且原子登记的 checkpoint history 最后一步记录真实 loss，dashboard 与训练页只显示单任务最近 120 个检查点样本，非逐步实时遥测，不混合任务；旧数据无指标保持空状态。新增 SQLite 只读快照测试及原生 Windows smoke：拒绝无授权、持久队列创建/暂停/恢复/取消、实际空队列 worker，未训练合成数据。真实 CPU 训练由既有专项验收；真实 GPU、逐步遥测、学生资产 GUI 下载、完整自动串联及像素级还原待后续。下一 E11c3 实时训练遥测与运行控制中心视觉校准，先核验 exact head CI。Windows GUI only，Europe PMC 暂缓，D 线只读。
+
+
+## E11c3a 逐步训练遥测与 GPU 监控（开发分支，待 CI）
+E11c2 修复 fd79b35 标准 45741425689、Windows 专项 45741425763 success。实际 optimizer update 完成后向可选 on_step 回调发出真实 loss、单步计算耗时、监督 token 数；训练队列写入按 job/attempt/step 区分的 SQLite 遥测，校验 worker 所有权、连续性、边界及有限数值，checkpoint 原子登记时标记已提交，恢复后隐藏未提交点、下一次 attempt 清理旧未提交记录。不改变 checkpoint history/确定性训练数据；快照只读、仅一个任务最近120点，兼容旧 checkpoint 事件。Windows GUI 3秒轮询，区分未保存黄色点与已保存点，速度和计算 ETA 只在活跃且30秒内采样时显示（不含 checkpoint/加载/等待）；NVIDIA SMI 扩展 GPU利用率/温度/功耗，缺失为 null，旧驱动拒绝扩展字段时退回基础探测。真实微型 CPU smoke 新增逐步遥测与完整训练 loss 对照、保留原逐位相等断言；单元测试覆盖 GPU 不支持及异常恢复隐藏。未通过新 CI，真实 GPU、本机逐步性能开销、学生资产 GUI 下载、原图高保真及自动化联动待后续 E11c3b/c。Windows GUI only，Europe PMC 暂缓，D 线只读。

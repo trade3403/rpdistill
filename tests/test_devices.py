@@ -29,3 +29,13 @@ class DeviceTests(unittest.TestCase):
     def test_malformed_gpu(self, run, _):
         run.return_value.stdout = "bad output"
         self.assertEqual(nvidia_info()["status"], "probe_failed")
+
+    @patch("rpdistill.devices.shutil.which", return_value="nvidia-smi")
+    @patch("rpdistill.devices.subprocess.run")
+    def test_optional_gpu_metrics(self,run,_):
+        run.return_value.stdout="0, GPU test, 8192, 4096, 72, 61, 140.5\n1, GPU old, 4096, 3000, N/A, [Not Supported], NaN\n"
+        a,b=nvidia_info()["devices"]
+        self.assertEqual((a["utilization_percent"],a["temperature_c"],a["power_w"]),(72,61,140.5))
+        self.assertIsNone(b["utilization_percent"])
+        self.assertIsNone(b["temperature_c"])
+        self.assertIsNone(b["power_w"])

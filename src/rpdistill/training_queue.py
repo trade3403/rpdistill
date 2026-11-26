@@ -73,6 +73,11 @@ class TrainingQueue:
                 step INTEGER NOT NULL DEFAULT 0,attempt INTEGER NOT NULL DEFAULT 0,
                 reserved_seconds INTEGER NOT NULL DEFAULT 0,reserved_bytes INTEGER NOT NULL DEFAULT 0,
                 checkpoint TEXT,checkpoint_id TEXT,error TEXT,created TEXT NOT NULL,updated TEXT NOT NULL)""")
+            db.execute("""CREATE TABLE IF NOT EXISTS training_step_metrics (
+                job_id TEXT NOT NULL,attempt INTEGER NOT NULL,step INTEGER NOT NULL,
+                loss REAL NOT NULL,seconds REAL NOT NULL,tokens INTEGER NOT NULL,
+                committed INTEGER NOT NULL DEFAULT 0,created TEXT NOT NULL,
+                PRIMARY KEY(job_id,attempt,step))""")
             db.execute("""CREATE TABLE IF NOT EXISTS training_events (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,job_id TEXT NOT NULL,
                 state TEXT NOT NULL,detail TEXT NOT NULL,created TEXT NOT NULL)""")
@@ -178,6 +183,25 @@ class TrainingQueue:
                        note="unregistered files retained; previous committed checkpoint remains authoritative")
             return self._get(db,id)
 
+    def record_step(self,id,attempt,metric,seconds):
+        step,loss,tokens=metric["step"],metric["loss"],metric["supervised_tokens"]
+        if (type(step) is not int or type(tokens) is not int or tokens<=0
+            or type(loss) not in (int,float) or not math.isfinite(loss) or loss<0
+            or type(seconds) not in (int,float) or not math.isfinite(seconds) or seconds<=0):
+            raise ValueError("invalid step telemetry")
+        with self.write() as db:
+            row=self._get(db,id)
+            if row["attempt"]!=attempt or row["state"] not in ACTIVE:
+                raise ValueError("worker ownership lost")
+            if not row["step"]<step<=min(row["spec"]["config"]["training"]["steps"],
+                                         row["step"]+row["spec"]["segment_steps"]):
+                raise ValueError("invalid telemetry step")
+            last=db.execute("SELECT max(step) FROM training_step_metrics WHERE job_id=? AND attempt=?",(id,attempt)).fetchone()[0]
+            if step!=(last if last is not None else row["step"])+1:
+                raise ValueError("nonsequential telemetry")
+            db.execute("INSERT INTO training_step_metrics VALUES (?,?,?,?,?,?,0,?)",
+                       (id,attempt,step,loss,seconds,tokens,now()))
+
     def run_next(self,*,prepare=prepare_reviewed_snapshot,execute=run_segment,profile=FIXED,max_segments=1000):
         bounded(max_segments,1,1000,"worker segment limit")
         with self.write() as db:
@@ -203,6 +227,8 @@ class TrainingQueue:
                 if seconds<=0 or row["reserved_bytes"]+size>spec["total_checkpoint_bytes"]:
                     self.state(db,id,"budget_exhausted")
                     return self._get(db,id)
+                # Uncommitted observations from earlier attempts are not resumable progress.
+                db.execute("DELETE FROM training_step_metrics WHERE job_id=? AND committed=0",(id,))
                 attempt=row["attempt"]+1
                 db.execute("""UPDATE training_jobs SET attempt=?,reserved_seconds=reserved_seconds+?,
                     reserved_bytes=reserved_bytes+?,updated=? WHERE id=?""",(attempt,seconds,size,now(),id))
@@ -226,7 +252,8 @@ class TrainingQueue:
                     reviewed_teacher_license=spec["reviewed_teacher_license"],limit=spec["limit"])
                 result=execute(examples,destination,config=config,profile=profile,provenance=provenance,
                     resume=row["checkpoint"],run_steps=spec["segment_steps"],max_seconds=seconds,
-                    max_checkpoint_bytes=size,should_stop=lambda:self.get(id)["state"]!="running")
+                    max_checkpoint_bytes=size,should_stop=lambda:self.get(id)["state"]!="running",
+                    on_step=lambda metric,seconds:self.record_step(id,attempt,metric,seconds))
                 m,actual=verified_checkpoint(destination,profile,row["step"],config.training.steps)
                 if (m["checkpoint_id"]!=result.get("checkpoint_id") or actual>size
                     or m["step"]>row["step"]+spec["segment_steps"]):
@@ -237,6 +264,8 @@ class TrainingQueue:
                         raise ValueError("worker ownership lost")
                     db.execute("UPDATE training_jobs SET step=?,checkpoint=?,checkpoint_id=?,updated=? WHERE id=?",
                                (m["step"],str(destination),m["checkpoint_id"],now(),id))
+                    db.execute("UPDATE training_step_metrics SET committed=1 WHERE job_id=? AND attempt=? AND step<=?",
+                               (id,attempt,m["step"]))
                     target=("complete" if m["status"]=="complete" else
                         "cancelled" if latest["state"]=="cancel_requested" else
                         "paused" if latest["state"]=="pause_requested" or m["stop_reason"]=="cuda_allocation_budget_boundary" else

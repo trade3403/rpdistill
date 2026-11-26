@@ -47,3 +47,7 @@ E11c1 d9f6076 标准 45739368042、专项 45739368036 success。新增固定 Mar
 
 ## E11c2 快照计数协议修复（待 CI）
 ce815be 标准 CI 45740525104 4/10 success，六个跨平台 CPU 矩阵任务失败；已核查 Ubuntu 3.11 与 Windows 3.12 日志，均为 test_missing_db_does_not_create：将固定学生单检查点最低容量 961265388 bytes 错误放入 counts，导致空数据库计数不为零。现将容量独立为顶层 checkpoint_min_bytes，GUI 改读该字段，保留原始零计数断言并新增容量独立断言；不改变训练预算或安全门槛。专项 CI 45740525052 success。新提交标准与 Windows 专项全部通过后再进入 E11c3。
+
+
+## E11c3a 逐步训练遥测与 GPU 监控（开发分支，待 CI）
+E11c2 修复 fd79b35 标准 45741425689、Windows 专项 45741425763 success。实际 optimizer update 完成后向可选 on_step 回调发出真实 loss、单步计算耗时、监督 token 数；训练队列写入按 job/attempt/step 区分的 SQLite 遥测，校验 worker 所有权、连续性、边界及有限数值，checkpoint 原子登记时标记已提交，恢复后隐藏未提交点、下一次 attempt 清理旧未提交记录。不改变 checkpoint history/确定性训练数据；快照只读、仅一个任务最近120点，兼容旧 checkpoint 事件。Windows GUI 3秒轮询，区分未保存黄色点与已保存点，速度和计算 ETA 只在活跃且30秒内采样时显示（不含 checkpoint/加载/等待）；NVIDIA SMI 扩展 GPU利用率/温度/功耗，缺失为 null，旧驱动拒绝扩展字段时退回基础探测。真实微型 CPU smoke 新增逐步遥测与完整训练 loss 对照、保留原逐位相等断言；单元测试覆盖 GPU 不支持及异常恢复隐藏。未通过新 CI，真实 GPU、本机逐步性能开销、学生资产 GUI 下载、原图高保真及自动化联动待后续 E11c3b/c。Windows GUI only，Europe PMC 暂缓，D 线只读。

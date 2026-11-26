@@ -84,11 +84,27 @@ def snapshot(db_path):
                 # One job, bounded recent checkpoint samples. Never blend distinct runs.
                 chosen=db.execute("""SELECT id FROM training_jobs WHERE step>0
                     ORDER BY CASE WHEN state IN ('running','pause_requested','cancel_requested') THEN 0 ELSE 1 END,updated DESC,id LIMIT 1""").fetchone()
+                if "training_step_metrics" in available:
+                    # Prefer the active job even before its first checkpoint.
+                    chosen=db.execute("""SELECT id FROM training_jobs
+                        WHERE state IN ('running','pause_requested','cancel_requested')
+                        OR step>0 ORDER BY CASE WHEN state IN ('running','pause_requested','cancel_requested')
+                        THEN 0 ELSE 1 END,updated DESC,id LIMIT 1""").fetchone()
                 if chosen:
                     rows["training_loss"]=[dict(r) for r in db.execute("""SELECT job_id,
                         json_extract(detail,'$.step') AS step,json_extract(detail,'$.loss') AS loss
                         FROM training_events WHERE job_id=? AND json_type(detail,'$.loss') IN ('integer','real')
                         ORDER BY seq DESC LIMIT 120""",(chosen[0],))][::-1]
+                    if "training_step_metrics" in available:
+                        samples=[dict(r) for r in db.execute("""SELECT m.job_id,m.step,m.loss,m.seconds,m.tokens,
+                            m.committed,m.created,j.state,j.step AS durable_step,
+                            json_extract(j.spec,'$.config.training.steps') AS target_steps
+                            FROM training_step_metrics m JOIN training_jobs j ON j.id=m.job_id
+                            WHERE m.job_id=? AND (m.committed=1 OR (m.attempt=j.attempt AND j.state IN
+                            ('running','pause_requested','cancel_requested') AND m.step>j.step))
+                            ORDER BY m.step DESC LIMIT 120""",(chosen[0],))][::-1]
+                        if samples:
+                            rows["training_loss"]=samples
             for key,sql in QUERIES.items():
                 if TABLES[key] in available:
                     if key=="downloads":

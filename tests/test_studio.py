@@ -117,3 +117,30 @@ class StudioTests(unittest.TestCase):
             self.assertTrue(r["training_metrics_available"])
             self.assertNotIn("spec",r["rows"]["training"][0])
             self.assertEqual(p.read_bytes(),before)
+
+    @patch("rpdistill.studio.device_report",return_value={})
+    def test_provisional_metrics_hide_after_recovery(self,_):
+        from rpdistill.training_queue import TrainingQueue
+        from rpdistill.distill import DistillConfig
+        from rpdistill.resumable import ResumeConfig
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/"db"
+            q=TrainingQueue(p)
+            j=q.enqueue("e"*64,Path(tmp)/"assets",Path(tmp)/"states",reviewed_dataset="e"*64,
+                reviewed_teacher_license="mit",config=ResumeConfig(DistillConfig(steps=4)),
+                total_seconds=300,total_checkpoint_bytes=2**30)
+            with q.write() as db:
+                db.execute("UPDATE training_jobs SET step=1,attempt=2,state='running' WHERE id=?",(j["id"],))
+                db.execute("INSERT INTO training_step_metrics VALUES (?,?,?,?,?,?,1,?)",
+                           (j["id"],1,1,2.0,0.5,12,"2026-01-01"))
+            q.record_step(j["id"],2,{"step":2,"loss":1.5,"supervised_tokens":12},0.25)
+            with self.assertRaises(ValueError):
+                q.record_step(j["id"],1,{"step":2,"loss":99,"supervised_tokens":12},0.25)
+            before=p.read_bytes()
+            r=snapshot(p)
+            self.assertEqual([v["committed"] for v in r["rows"]["training_loss"]],[1,0])
+            self.assertEqual(r["rows"]["training"][0]["step"],1)
+            self.assertEqual(r["rows"]["training_loss"][-1]["seconds"],0.25)
+            self.assertEqual(p.read_bytes(),before)
+            q.recover(j["id"],worker_stopped=True)
+            self.assertEqual([v["step"] for v in snapshot(p)["rows"]["training_loss"]],[1])

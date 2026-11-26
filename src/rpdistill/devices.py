@@ -1,5 +1,6 @@
 """Read-only hardware discovery; no model loading or GPU allocation."""
 import csv
+import math
 import os
 from pathlib import Path
 import platform
@@ -35,18 +36,33 @@ def nvidia_info() -> dict:
     if not binary:
         return {"status": "unavailable", "devices": []}
     try:
-        result = subprocess.run(
-            [binary, "--query-gpu=index,name,memory.total,memory.free",
-             "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, check=True, timeout=5,
-        )
+        def query(fields):
+            return subprocess.run([binary, "--query-gpu="+fields,
+                "--format=csv,noheader,nounits"],capture_output=True,text=True,check=True,timeout=5)
+        try:
+            result=query("index,name,memory.total,memory.free,utilization.gpu,temperature.gpu,power.draw")
+        except subprocess.CalledProcessError:
+            # Older drivers may reject optional fields; keep basic memory discovery.
+            result=query("index,name,memory.total,memory.free")
+        def optional(raw,low,high):
+            try:
+                value=float(raw)
+                return value if math.isfinite(value) and low<=value<=high else None
+            except ValueError:
+                return None
         devices = []
         for row in csv.reader(result.stdout.splitlines(), skipinitialspace=True):
-            if len(row) != 4:
+            if len(row) not in (4,7):
                 raise ValueError("unexpected nvidia-smi output")
-            index, name, total, free = (value.strip() for value in row)
-            devices.append({"index": int(index), "name": name,
-                            "total_mib": int(total), "free_mib": int(free)})
+            index,name,total,free=(v.strip() for v in row[:4])
+            total,free=int(total),int(free)
+            if not 0<=free<=total or int(index)<0:
+                raise ValueError("invalid GPU memory values")
+            extra=row[4:] if len(row)==7 else ["","",""]
+            devices.append({"index":int(index),"name":name,"total_mib":total,"free_mib":free,
+                            "utilization_percent":optional(extra[0],0,100),
+                            "temperature_c":optional(extra[1],-50,150),
+                            "power_w":optional(extra[2],0,10000)})
         return {"status": "detected" if devices else "unavailable", "devices": devices}
     except (OSError, subprocess.SubprocessError, ValueError):
         return {"status": "probe_failed", "devices": []}
