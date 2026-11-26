@@ -265,23 +265,28 @@ class CorpusStore:
         key = json.dumps([teacher,options,PROMPT_VERSION,POLICY_VERSION],sort_keys=True)
         stats = Counter(generated=0,cached=0,screened=0,rejected=0,failed=0)
         # Read bounded pending work, preserve already completed candidates.
+        # Explicitly finalize the streaming SELECT before opening write transactions.
+        # sqlite3.Connection.close() alone may leave an unfinished cursor holding
+        # a read lock when the bounded loop exits early.
+        pending = []
         with closing(self.connect()) as db:
-            rows = db.execute("""SELECT s.record FROM corpus_segments s
+            with closing(db.execute("""SELECT s.record FROM corpus_segments s
                 JOIN papers p ON p.pmcid=s.pmcid JOIN paper_fulltexts f ON f.pmcid=s.pmcid
                 WHERE json_extract(p.record,'$.eligibility')='pending_fulltext_license'
                 AND json_extract(f.record,'$.status')='downloaded_pending_content_review'
                 AND json_extract(f.record,'$.sha256')=json_extract(s.record,'$.attribution.xml_sha256')
-                ORDER BY row_number() OVER (PARTITION BY s.pmcid ORDER BY s.id),s.pmcid,s.id""")
-            pending = []
-            for row in rows:
-                segment = json.loads(row[0])
-                pid = digest((segment["segment_id"]+key).encode())
-                if db.execute("SELECT 1 FROM corpus_pairs WHERE id=?",(pid,)).fetchone():
-                    stats["cached"] += 1
-                    continue
-                pending.append((pid,segment))
-                if len(pending)>=limit:
-                    break
+                ORDER BY row_number() OVER (PARTITION BY s.pmcid ORDER BY s.id),s.pmcid,s.id""")) as rows:
+                for row in rows:
+                    segment = json.loads(row[0])
+                    pid = digest((segment["segment_id"]+key).encode())
+                    with closing(db.execute("SELECT 1 FROM corpus_pairs WHERE id=?",(pid,))) as existing:
+                        cached = existing.fetchone() is not None
+                    if cached:
+                        stats["cached"] += 1
+                        continue
+                    pending.append((pid,segment))
+                    if len(pending)>=limit:
+                        break
         for offset in range(0,len(pending),translator.options.batch_size):
             batch = pending[offset:offset+translator.options.batch_size]
             try:

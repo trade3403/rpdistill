@@ -123,3 +123,13 @@ class CorpusTests(unittest.TestCase):
         with closing(self.store.connect()) as db:
             papers={json.loads(row[0])["pmcid"] for row in db.execute("SELECT record FROM corpus_pairs")}
         self.assertEqual(papers,{"PMC123","PMC999"})
+        # A second bounded call must see prior committed pairs, close its read
+        # cursor even when the limit is reached, and write only pending work.
+        second=self.store.translate(self.translator(),limit=1)
+        self.assertEqual(second["generated"],1)
+        self.assertEqual(second["cached"],2)
+        final=self.store.translate(self.translator(),limit=1)
+        self.assertEqual(final["generated"],0)
+        self.assertEqual(final["cached"],3)
+        with closing(self.store.connect()) as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM corpus_pairs").fetchone()[0],3)

@@ -177,3 +177,7 @@ E11c2 修复 fd79b35 标准 45741425689、Windows 专项 45741425763 success。�
 
 ## E12b2 真实 PMC 论文与预训练教师全链路（开发分支，待 CI）
 前置d3f48d8标准45793392808、专项45793392758全success，真实教师job139817800301报告：固定Qwen2.5-0.5B-Instruct权重已验证1015466447字节，下载14.36s、CPU FP32加载2.828s、翻译6段10.312s（0.582段/s），5筛查候选/1拒绝/0异常，split 2/2/1，候选版本62790b04d72fb8d4859795a366a49fbe6a07812f58b019e2d259a8848bb474a5、payload hash验证；4°C误译为-4°C被numeric_mismatch拒绝；其他通过项仍有术语/语义偏差，不是人工质量认证。E12b2新增真实NCBI PMC搜索malaria 2024全年、最多40篇、64MiB全文预算、最多120段、真实固定Qwen模型权重（1200MiB预算），直接调用生产CorpusPipeline（不注入搜索/教师/下载fake），CPU FP32 2048输入/384输出/batch2，沿用默认10/1/1数据门槛。逐篇复核实际XML哈希/许可及来源，逐对核查teacher、split、source hash，验证三split有中文筛查候选、冻结payload与复用；真实报告只留来源标识/许可/哈希/聚合质量flag及阶段，不上传论文原文或译文。生产语料待翻译排序改为跨论文row_number轮询，防止单篇耗尽预算；新增两篇有限预算回归，不更改质量门槛。Windows专项真实网络及CPU测试45分钟上限，失败保留已形成报告，未确认新CI。真实服务可用性、默认门槛与吞吐待验收；不等于人审或正式训练授权。下一E12c真实NVIDIA GPU蒸馏，需实际硬件可用，不以CPU替代。Windows GUI only，Europe PMC暂缓，D线只读，未合并main。
+
+
+### E12b2 修复：有界读取游标释放（待新 CI）
+8a41c0a标准45796740277的六个CPU单测矩阵均在test_bounded_translation_spreads_across_papers译文写事务提交处报sqlite3.OperationalError database is locked；SDK/真实CPU教师/学生/评测均通过。专项45796740194其余六项通过，真实PMC job139829215015失败于阶段3（翻译），报告证实真实模型校验1015466447字节、NCBI检索40/下载40/零失败/6588637字节、解析1497段，管线164.906秒，未完成译文登记或候选冻结。根因：跨论文排序流式SELECT在达到limit时提前break，Connection.close不能保证尚存Cursor释放读取锁；补充显式closing主游标和缓存查询游标，在推理和写入前释放；保留跨论文轮询及原预算/生产门槛，追加第二次有限调用、缓存复用、最终总数回归。未降低测试，未进入E12c，待新提交标准与Windows专项均通过。实际PMC报告见旧run artifact 15106025964。无本地GPU验收，main/D线不修改。
