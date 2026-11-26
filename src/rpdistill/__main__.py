@@ -36,6 +36,7 @@ from .rust_profile import rust_profile
 from .projection_experiment import compare_projection
 from .export_review import review_integration, check_integration_receipt
 from .studio import snapshot as studio_snapshot
+from .studio_evaluation import evaluate_job, recover_evaluation
 
 
 def runtime_info() -> dict[str, str]:
@@ -55,6 +56,14 @@ def parser() -> argparse.ArgumentParser:
     commands = p.add_subparsers(dest="command")
     commands.add_parser("info")
     commands.add_parser("studio-snapshot")
+    studio_eval=commands.add_parser("studio-evaluate")
+    studio_eval.add_argument("id")
+    for flag in ("input","root","review-note"):
+        studio_eval.add_argument("--"+flag,required=True)
+    studio_eval.add_argument("--approved",action="store_true")
+    studio_recover=commands.add_parser("studio-evaluation-recover")
+    studio_recover.add_argument("id")
+    studio_recover.add_argument("--worker-stopped",action="store_true")
     dev = commands.add_parser("devices")
     dev.add_argument("--path", default=".")
     create = commands.add_parser("create")
@@ -534,6 +543,10 @@ def main(argv=None) -> int:
             result=student_contract()
             if args.assets:
                 result["verified_assets"]=str(checked_assets(args.assets))
+        elif args.command == "studio-evaluate":
+            result=evaluate_job(args.db,args.id,args.input,args.root,args.review_note,approved=args.approved)
+        elif args.command == "studio-evaluation-recover":
+            result=recover_evaluation(args.db,args.id,worker_stopped=args.worker_stopped)
         elif args.command == "studio-snapshot":
             result=studio_snapshot(args.db)
         elif args.command == "devices":

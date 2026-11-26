@@ -45,9 +45,11 @@ const worker:WorkerStatus={running:false,stop_requested:false,message:"下载执
 const trainingWorker:WorkerStatus={running:false,stop_requested:false,message:"训练执行器未启动"};
 const assets=resolve(process.env.RPDISTILL_STUDENT_ASSETS||join(homedir(),".rpdistill","student-assets"));
 const checkpointRoot=resolve(process.env.RPDISTILL_CHECKPOINT_ROOT||join(homedir(),".rpdistill","checkpoints"));
+const evaluationWorker:WorkerStatus={running:false,stop_requested:false,message:"评测执行器未启动"};
+const evaluationRoot=resolve(process.env.RPDISTILL_EVALUATION_ROOT||join(homedir(),".rpdistill","evaluations"));
 const assetWorker:WorkerStatus={running:false,stop_requested:false,message:"学生资源下载未启动"};
 function startAssets():ModelReply{
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
  assetWorker.running=true;assetWorker.message="正在获取固定版本分词器资源";
  const child=spawn(python,["-m","rpdistill","--db",db,"student-assets","--root",assets,"--max-bytes","4194304"],{
   shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
@@ -64,7 +66,7 @@ function startAssets():ModelReply{
  return {ok:true,data:{...assetWorker}};
 }
 function startTraining():ModelReply{
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
  trainingWorker.running=true;trainingWorker.message="正在执行队列首个已授权训练任务";
  const child=spawn(python,["-m","rpdistill","--db",db,"training-run"],{shell:false,windowsHide:true,
   stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8",CUBLAS_WORKSPACE_CONFIG:":4096:8"}});
@@ -82,7 +84,7 @@ function startTraining():ModelReply{
 }
 const corpusWorker:{running:boolean;id:string|null;message:string}={running:false,id:null,message:"语料执行器未启动"};
 function startCorpus(id:string):ModelReply{
- if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
+ if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
  corpusWorker.running=true;corpusWorker.id=id;corpusWorker.message="正在执行单次语料流水线";
  const child=spawn(python,["-m","rpdistill","--db",db,"pipeline-run",id],{
   shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
@@ -127,7 +129,7 @@ function nextDownload(){
 }
 function workerAction(kind:string):ModelReply{
  if(kind==="worker-start"){
-  if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
+  if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
   worker.running=true;worker.stop_requested=false;worker.message="正在启动执行器";
   setImmediate(nextDownload);
   return {ok:true,data:{...worker}};
@@ -137,10 +139,32 @@ function workerAction(kind:string):ModelReply{
  return {ok:true,data:{...worker}};
 }
 let modelPending=false;
+async function startEvaluation(args:string[]):Promise<ModelReply>{
+ if(!win||worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作运行"};
+ evaluationWorker.running=true;evaluationWorker.message="等待选择人工审核 JSONL";
+ let input:string;
+ try{
+  const selected=await dialog.showOpenDialog(win,{properties:["openFile"],filters:[{name:"人工参考译文 JSONL",extensions:["jsonl"]}]});
+  if(selected.canceled||selected.filePaths.length!==1){evaluationWorker.running=false;evaluationWorker.message="已取消文件选择";return {ok:false,error:"已取消文件选择"}}
+  input=selected.filePaths[0];
+ }catch{evaluationWorker.running=false;return {ok:false,error:"文件选择失败"}}
+ evaluationWorker.message="正在进行本地 CPU 学生模型评测";
+ const child=spawn(python,["-m","rpdistill","--db",db,...args,"--input",input,"--root",evaluationRoot],{shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+ const chunks:Buffer[]=[];let size=0,failed=false;
+ child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else failed=true});
+ child.stderr.resume();child.on("error",()=>{failed=true});
+ child.on("close",code=>{evaluationWorker.running=false;
+  if(code!==0||failed){evaluationWorker.message="评测失败，请核对评测集、检查点和依赖";return}
+  try{const result=JSON.parse(Buffer.concat(chunks).toString("utf8"));evaluationWorker.message=result.state==="complete"?"评测报告已生成，非发布批准":"评测结果异常"}catch{evaluationWorker.message="评测响应异常"}
+ });
+ return {ok:true,data:{...evaluationWorker}};
+}
 function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
  if(args[0]==="worker-start"||args[0]==="worker-stop")return Promise.resolve(workerAction(args[0]));
+ if(args[0]==="studio-evaluate")return startEvaluation(args);
+ if(args[0]==="studio-evaluation-recover"&&evaluationWorker.running)return Promise.resolve({ok:false,error:"本地评测执行器仍运行"});
  if(args[0]==="student-assets")return Promise.resolve(startAssets());
  if(args[0]==="training-run")return Promise.resolve(startTraining());
  if(args[0]==="training-recover"&&trainingWorker.running)return Promise.resolve({ok:false,error:"本地训练执行器仍运行"});
@@ -178,7 +202,7 @@ function create(){
   win.webContents.on("will-navigate",(e,url)=>{if(url!==allowedURL)e.preventDefault()});
   win.webContents.on("will-attach-webview",e=>e.preventDefault());
   win.on("close",event=>{
-    if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running){event.preventDefault();dialog.showMessageBoxSync(win!,{type:"info",title:"执行器仍在运行",message:"请等待语料或学生资源任务完成，或先暂停/取消模型下载及训练任务，再关闭窗口。"});}
+    if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running){event.preventDefault();dialog.showMessageBoxSync(win!,{type:"info",title:"执行器仍在运行",message:"请等待语料、学生资源或评测任务完成，或先暂停/取消模型下载及训练任务，再关闭窗口。"});}
   });
   win.on("closed",()=>{win=null});
   if(smoke)win.setContentSize(1672,941);
@@ -191,7 +215,7 @@ app.whenReady().then(()=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
        event.senderFrame!==win.webContents.mainFrame)return {ok:false,error:"请求来源无效"} satisfies Reply;
     const reply=await query();
-    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker},local_corpus_worker:{...corpusWorker},local_training_worker:{...trainingWorker},local_asset_worker:{...assetWorker}}}:reply;
+    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker},local_corpus_worker:{...corpusWorker},local_training_worker:{...trainingWorker},local_asset_worker:{...assetWorker},local_evaluation_worker:{...evaluationWorker}}}:reply;
   });
   ipcMain.handle("studio:model-action",(event,request:unknown)=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
@@ -220,5 +244,5 @@ app.whenReady().then(()=>{
   create();
   app.on("activate",()=>{if(!win)create()});
 });
-app.on("before-quit",event=>{if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running){event.preventDefault();if(win)dialog.showMessageBoxSync(win,{type:"info",message:"执行器仍在运行，请先结束当前任务。"});}});
+app.on("before-quit",event=>{if(worker.running||corpusWorker.running||trainingWorker.running||assetWorker.running||evaluationWorker.running){event.preventDefault();if(win)dialog.showMessageBoxSync(win,{type:"info",message:"执行器仍在运行，请先结束当前任务。"});}});
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit()});

@@ -16,8 +16,17 @@ SCHEMA="rpdistill-studio-snapshot-v1"
 TABLES={"teachers":"teachers","modelscope_teachers":"modelscope_teachers",
         "downloads":"model_download_jobs","papers":"papers","fulltexts":"paper_fulltexts",
         "segments":"corpus_segments","pairs":"corpus_pairs","datasets":"dataset_versions",
-        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks"}
+        "pipelines":"corpus_runs","training":"training_jobs","tasks":"tasks","evaluations":"studio_evaluations"}
 QUERIES={
+    "evaluations":"""SELECT id,training_id,version,checkpoint_id,state,updated,error,
+        json_extract(summary,'$.report_id') AS report_id,json_extract(summary,'$.benchmark_id') AS benchmark_id,
+        json_extract(summary,'$.metrics.bleu') AS bleu,json_extract(summary,'$.metrics.chrf') AS chrf,
+        json_extract(summary,'$.metrics.numeric') AS numeric,json_extract(summary,'$.metrics.citations') AS citations,
+        json_extract(summary,'$.metrics.terminology') AS terminology,json_extract(summary,'$.metrics.protected') AS protected,
+        json_extract(summary,'$.coverage.cases') AS cases,json_extract(summary,'$.coverage.papers') AS papers,
+        json_extract(summary,'$.automatic_gate_passed') AS automatic_gate_passed,
+        substr(json_extract(summary,'$.failures'),1,1000) AS failures
+        FROM studio_evaluations ORDER BY updated DESC,id LIMIT 50""",
     "downloads":"""SELECT id,substr(json_extract(spec,'$.model_id'),1,200) AS model_id,
         coalesce(json_extract(spec,'$.source'),'huggingface') AS source,
         state,done_bytes,total_bytes,rate,eta,{network_bytes} AS network_bytes,
@@ -87,7 +96,7 @@ def student_resources(assets,checkpoint_root):
 def snapshot(db_path):
     path=Path(db_path).expanduser().resolve()
     counts={key:0 for key in TABLES}
-    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0)
+    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,evaluation_active=0)
     rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers","training_loss","training_events")}
     exists=path.exists()
     if exists:
@@ -139,6 +148,8 @@ def snapshot(db_path):
                             ORDER BY m.step DESC LIMIT 120""",(chosen[0],))][::-1]
                         if samples:
                             rows["training_loss"]=samples
+            if TABLES["evaluations"] in available:
+                counts["evaluation_active"]=db.execute("SELECT count(*) FROM studio_evaluations WHERE state='running'").fetchone()[0]
             for key,sql in QUERIES.items():
                 if TABLES[key] in available:
                     if key=="downloads":

@@ -9,6 +9,14 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "evaluate-job":
+  exact(["kind","id","review_note","approved"]);
+  if(!job(r.id)||typeof r.review_note!=="string"||!r.review_note.trim()||r.review_note.length>2000||/[\x00-\x1f\x7f]/.test(r.review_note)||r.approved!==true)throw Error("evaluation approval");
+  return ["studio-evaluate",r.id,"--review-note="+r.review_note.trim(),"--approved"];
+ case "evaluation-recover":
+  exact(["kind","id","worker_stopped"]);
+  if(!job(r.id)||r.worker_stopped!==true)throw Error("evaluation recovery");
+  return ["studio-evaluation-recover",r.id,"--worker-stopped"];
  case "student-assets":
   exact(["kind","approved"]);
   if(r.approved!==true)throw Error("asset approval");
