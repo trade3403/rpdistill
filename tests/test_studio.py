@@ -16,6 +16,8 @@ class StudioTests(unittest.TestCase):
             self.assertFalse(r["database_exists"])
             self.assertEqual(r["schema"],SCHEMA)
             self.assertEqual(sum(r["counts"].values()),0)
+            self.assertGreater(r["checkpoint_min_bytes"],0)
+            self.assertNotIn("checkpoint_min_bytes",r["counts"])
     @patch("rpdistill.studio.device_report",return_value={})
     def test_actual_read_only_counts_and_bounded_rows(self,_):
         from rpdistill.downloads import DownloadQueue
@@ -109,7 +111,8 @@ class StudioTests(unittest.TestCase):
             before=p.read_bytes()
             r=snapshot(p)
             self.assertEqual(r["counts"]["training_active"],1)
-            self.assertEqual(r["counts"]["checkpoint_min_bytes"],required_bytes(FIXED))
+            self.assertEqual(r["checkpoint_min_bytes"],required_bytes(FIXED))
+            self.assertNotIn("checkpoint_min_bytes",r["counts"])
             self.assertEqual([v["loss"] for v in r["rows"]["training_loss"]],[2.5,1.75])
             self.assertTrue(r["training_metrics_available"])
             self.assertNotIn("spec",r["rows"]["training"][0])

@@ -2,6 +2,7 @@ export const SCHEMA = "rpdistill-studio-snapshot-v1";
 export interface Row { [key:string]: string | number | null }
 export interface WorkerStatus {running:boolean;stop_requested:boolean;message:string}
 export interface Snapshot {
+  checkpoint_min_bytes?:number;
   local_worker?:WorkerStatus;
   local_training_worker?:WorkerStatus;
   local_corpus_worker?:{running:boolean;id:string|null;message:string};

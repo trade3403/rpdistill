@@ -53,7 +53,7 @@ TEACHER_SQL="""SELECT substr(model_id,1,200) AS model_id,revision,
 def snapshot(db_path):
     path=Path(db_path).expanduser().resolve()
     counts={key:0 for key in TABLES}
-    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,checkpoint_min_bytes=required_bytes(FIXED))
+    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0)
     rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers","training_loss","training_events")}
     exists=path.exists()
     if exists:
@@ -102,5 +102,5 @@ def snapshot(db_path):
     while not disk.exists():
         disk=disk.parent
     return {"schema":SCHEMA,"version":__version__,"observed_at":datetime.now(timezone.utc).isoformat(),
-            "database_exists":exists,"counts":counts,"rows":rows,"devices":device_report(disk),
+            "database_exists":exists,"checkpoint_min_bytes":required_bytes(FIXED),"counts":counts,"rows":rows,"devices":device_report(disk),
             "read_only":True,"training_metrics_available":bool(rows["training_loss"]),"release_ready":False}

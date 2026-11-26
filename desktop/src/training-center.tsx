@@ -20,7 +20,7 @@ export function TrainingCenter({data,refresh,stale}:{data:Snapshot|null;refresh:
  function update(k:string,v:string){setFields(prev=>({...prev,[k]:v}));setApproved(false)}
  async function send(req:ModelRequest,msg:string){setBusy(true);setError("");setMessage("");try{const reply=await window.studio.modelAction(req);if(reply.ok){setMessage(msg);await refresh()}else setError(reply.error)}catch{setError("训练操作连接失败，请核对持久状态")}finally{setBusy(false)}}
  const num=(k:string)=>Number(fields[k]),mib=(k:string)=>num(k)*1024**2;
- const minBytes=data?.counts.checkpoint_min_bytes??Infinity;
+ const minBytes=data?.checkpoint_min_bytes??Infinity;
  const ready=!!selected&&!!license.trim()&&approved&&["steps","batch_size","learning_rate","accumulation","segment_steps","segment_seconds","total_seconds","checkpoint_bytes","total_checkpoint_bytes"].every(k=>Number.isFinite(num(k))&&num(k)>0)&&mib("checkpoint_bytes")>=minBytes&&mib("total_checkpoint_bytes")>=mib("checkpoint_bytes")&&num("total_seconds")>=num("segment_seconds")&&(device==="cpu"||mib("cuda_bytes")>0);
  return <>
  <section className="panel"><h2>学生蒸馏训练配置</h2><p className="muted">固定 RPTranslate Marian 学生架构。先通过 CLI student-assets 获取经校验的分词器资源；默认目录为 ~/.rpdistill/student-assets（可由可信启动环境 RPDISTILL_STUDENT_ASSETS 修改）。检查点默认 ~/.rpdistill/checkpoints。候选数据集必须先在本机审核实际内容、权利和教师蒸馏许可。</p>

@@ -226,3 +226,7 @@ E11b2 修复 26ec3cd 的标准 CI 45736731767 与 Windows 专项 45736731818 suc
 
 ## E11c2 训练中心第一轮（开发分支，待 CI）
 E11c1 d9f6076 标准 45739368042、专项 45739368036 success。新增固定 Marian 学生的 GUI 训练队列：精确候选版本与许可复核声明、优化器步数、批大小、学习率、累积、CPU/CUDA/精度、时间与检查点及显存软预算，固定可信启动环境资产/检查点目录（学生资产仍须 CLI student-assets 预备），创建与运行单独确认。GUI 显式启动一个 FIFO 任务，暂停/恢复/取消/人工确认异常恢复，保留 SQLite 单 worker、已验证 checkpoint、保守预算、后端每段重新核验数据与权利。本地下载/语料/训练执行器互斥、退出保护，不是系统全局锁。训练事件从已验证且原子登记的 checkpoint history 最后一步记录真实 loss，dashboard 与训练页只显示单任务最近 120 个检查点样本，非逐步实时遥测，不混合任务；旧数据无指标保持空状态。新增 SQLite 只读快照测试及原生 Windows smoke：拒绝无授权、持久队列创建/暂停/恢复/取消、实际空队列 worker，未训练合成数据。真实 CPU 训练由既有专项验收；真实 GPU、逐步遥测、学生资产 GUI 下载、完整自动串联及像素级还原待后续。下一 E11c3 实时训练遥测与运行控制中心视觉校准，先核验 exact head CI。Windows GUI only，Europe PMC 暂缓，D 线只读。
+
+
+## E11c2 快照计数协议修复（待 CI）
+ce815be 标准 CI 45740525104 4/10 success，六个跨平台 CPU 矩阵任务失败；已核查 Ubuntu 3.11 与 Windows 3.12 日志，均为 test_missing_db_does_not_create：将固定学生单检查点最低容量 961265388 bytes 错误放入 counts，导致空数据库计数不为零。现将容量独立为顶层 checkpoint_min_bytes，GUI 改读该字段，保留原始零计数断言并新增容量独立断言；不改变训练预算或安全门槛。专项 CI 45740525052 success。新提交标准与 Windows 专项全部通过后再进入 E11c3。
