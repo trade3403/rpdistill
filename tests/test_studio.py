@@ -1,6 +1,7 @@
 import tempfile
 from pathlib import Path
 import sqlite3
+from contextlib import closing
 import unittest
 from unittest.mock import patch
 from rpdistill.studio import snapshot,SCHEMA
@@ -43,7 +44,7 @@ class StudioTests(unittest.TestCase):
             p=Path(tmp)/"db.sqlite3"
             q=DownloadQueue(p)
             job=q.enqueue("org/model","a"*40,reviewed_license="apache-2.0",max_bytes=1000,cache_dir=tmp)
-            with sqlite3.connect(p) as db:
+            with closing(sqlite3.connect(p)) as db, db:
                 db.execute("UPDATE model_download_jobs SET state='running',network_bytes=123,network_rate=45.5 WHERE id=?",(job["id"],))
             before=p.read_bytes()
             r=snapshot(p)
@@ -52,7 +53,7 @@ class StudioTests(unittest.TestCase):
             self.assertEqual(r["rows"]["downloads"][0]["network_bytes"],123)
             self.assertEqual(r["rows"]["downloads"][0]["network_rate"],45.5)
             self.assertEqual(p.read_bytes(),before)
-            with sqlite3.connect(p) as db:
+            with closing(sqlite3.connect(p)) as db, db:
                 db.execute("ALTER TABLE model_download_jobs DROP COLUMN network_bytes")
                 db.execute("ALTER TABLE model_download_jobs DROP COLUMN network_rate")
             before=p.read_bytes()

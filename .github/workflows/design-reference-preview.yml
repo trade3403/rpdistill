@@ -5,6 +5,10 @@ on:
     paths:
       - '.github/workflows/design-reference-preview.yml'
       - 'desktop/**'
+      - 'src/rpdistill/**'
+      - 'tests/test_studio.py'
+      - 'scripts/studio_desktop_smoke.py'
+      - 'pyproject.toml'
       - 'docs/assets/**'
 permissions:
   contents: read
