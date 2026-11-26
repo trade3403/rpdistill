@@ -177,3 +177,7 @@ ca1760b 标准 CI 45746734363 为6/10 success，四个 macOS/Windows Python 3.11
 
 ## E11d2b2 本地集成验收及回执复核（开发分支，待 CI）
 前置 b612583 标准45750560517、专项45750560533 success。新增集成任务：已通过的登记collect→blind→同一评测→已验证FP32导出包，核对基线、匿名包、映射、原人审与分数哈希；明确数据集SHA/教师及模型许可证/权利声明/复核人/训练选择与软时间预算，复用既有review_integration重新评审默认门槛、当前权利/训练来源、权重一致、全部译文重放、Rust诊断，桥接程序哈希前后核对，保存receipt.json及登记双ID。历史回执校验使用登记的包/回执ID，明确不重新审核权利或认证身份。GUI允许选同源最近50项记录，可信启动环境指定桥接，无任意路径IPC；异常恢复沿用复核队列。新增跨源拒绝及历史回执双pin模拟回归、Windows IPC拒绝未授权与注入路径。真实GPU、真实人审、完整集成/生产加载器与分发均未验收，任何回执release_ready=false。下一E11d3 Windows安装包，须新CI全部通过；Windows GUI only，Europe PMC暂缓，D线只读，未合并main。
+
+
+## E11d3a Windows x64 安装候选（开发分支，待 CI）
+前置8fd6d57标准45772434850、专项45772434894 success。新增 electron-builder 26.0.12 NSIS 当前用户安装，目录可选、桌面/开始菜单快捷方式、卸载保留应用数据，明确禁止自动发布；未签名候选。构建从可信 Windows x64 setup-python 3.11 runtime 分离复制 Python EXE/DLL/标准库及许可证、安装本仓库基础包到隔离 packages，._pth 限定导入路径，不包含 pip/第三方 ML依赖或权重，安装版默认绝对路径内置后端，RPDISTILL_PYTHON可信覆盖保留。设置页显示可选依赖发现。新增分支及未来 main 的 Windows installer CI：实际生成NSIS EXE、静默安装、检查快捷方式、隔离PATH且无外部Python覆盖的真实Electron IPC smoke、卸载及外部测试数据保留检查，上传EXE和SHA-256验收JSON（7天）。不宣称安装已通过，待本次CI；不含CUDA/PyTorch/教师SDK/评测依赖/Rust桥接，使用可信外部Python环境，图形化依赖部署、升级/真实用户安装、代码签名/传递依赖锁定及GPU完整流程后续验收。Windows GUI only，Europe PMC暂缓，D线只读，未合并main。

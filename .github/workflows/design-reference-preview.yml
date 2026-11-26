@@ -11,6 +11,8 @@ on:
       - 'tests/test_studio_artifacts.py'
       - 'tests/test_studio_reviews.py'
       - 'scripts/studio_desktop_smoke.py'
+      - 'scripts/studio_prepare_windows_backend.py'
+      - 'scripts/studio_installer_smoke.py'
       - 'scripts/studio_visual_compare.py'
       - 'scripts/studio_live_download_smoke.py'
       - 'tests/test_downloads.py'
@@ -110,3 +112,42 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m rpdistill student-info --assets "${{ runner.temp }}/rpdistill-student-assets"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: python -m pip install -e ..
+      - name: Stage offline base Python backend
+        run: python ../scripts/studio_prepare_windows_backend.py --output build/backend
+      - name: Build unsigned Windows NSIS candidate
+        run: npm run package:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Install launch and uninstall
+        run: |
+          $installer = Get-ChildItem dist-installer/*-setup.exe
+          if (@($installer).Count -ne 1) { throw "Expected one installer" }
+          python ../scripts/studio_installer_smoke.py --installer "$($installer.FullName)" --report "${{ runner.temp }}/rpdistill-installer-report.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-unsigned-installer-candidate
+          path: |
+            desktop/dist-installer/*-setup.exe
+            ${{ runner.temp }}/rpdistill-installer-report.json
+          if-no-files-found: error
+          retention-days: 7

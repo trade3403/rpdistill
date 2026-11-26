@@ -105,7 +105,7 @@ def student_resources(assets,checkpoint_root):
     return {"state":state,"source":BASE_SOURCE,"revision":BASE_REVISION,
             "file_count":len(ASSETS),"asset_bytes":sum(v[0] for v in ASSETS.values()),
             "assets_free_bytes":free_bytes(assets),"checkpoint_free_bytes":free_bytes(checkpoint_root),
-            "dependencies":{name:present(name) for name in ("torch","transformers","sentencepiece","safetensors")},
+            "dependencies":{name:present(name) for name in ("torch","transformers","sentencepiece","safetensors","huggingface_hub","modelscope_hub","sacrebleu")},
             "runtime_verified":False}
 
 

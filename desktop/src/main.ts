@@ -10,7 +10,7 @@ const smoke=process.argv.includes("--studio-smoke");
 const page=join(__dirname,"index.html");
 const allowedURL=pathToFileURL(page).href;
 // Trusted operator-selected executable path only; no renderer arguments or shell.
-const python=process.env.RPDISTILL_PYTHON || (process.platform==="win32"?"python":"python3");
+const python=process.env.RPDISTILL_PYTHON || (app.isPackaged&&process.platform==="win32"?join(process.resourcesPath,"backend","python.exe"):process.platform==="win32"?"python":"python3");
 const db=resolve(process.env.RPDISTILL_DB || join(homedir(),".rpdistill","tasks.sqlite3"));
 let pending:Promise<Reply>|undefined;
 function query():Promise<Reply>{

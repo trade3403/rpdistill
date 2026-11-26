@@ -3,6 +3,7 @@
 Linux and macOS GUI are out of scope; their backend tests remain independent.
 Uses isolated temporary files and the actual local Python executable.
 """
+import argparse
 import os
 from pathlib import Path
 import subprocess
@@ -13,9 +14,12 @@ import tempfile
 def main():
     if sys.platform != "win32":
         raise SystemExit("Desktop smoke supports Windows only")
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--installed",type=Path)
+    args=parser.parse_args()
     desktop = Path(__file__).resolve().parents[1] / "desktop"
     cli = desktop / "node_modules" / "electron" / "cli.js"
-    if not cli.is_file():
+    if args.installed is None and not cli.is_file():
         raise SystemExit("Install desktop dependencies and build first")
     with tempfile.TemporaryDirectory(prefix="rpdistill-studio-") as tmp:
         root = Path(tmp)
@@ -30,8 +34,22 @@ def main():
         # Isolated registry fixture for pipeline creation only; never load its weights.
         from rpdistill.teachers import TeacherRegistry, Teacher
         TeacherRegistry(db).put(Teacher("fixture/model", "a" * 40, "apache-2.0", False, False, None), root / "cache", [])
-        result = subprocess.run(["node", str(cli), ".", "--studio-smoke"],
-            cwd=desktop, env=env, check=True, timeout=150, capture_output=True,
+        command=["node",str(cli),".","--studio-smoke"]
+        cwd=desktop
+        if args.installed is not None:
+            exe=args.installed.resolve(strict=True)
+            backend=exe.parent/"resources"/"backend"/"python.exe"
+            if not backend.is_file():
+                raise SystemExit("Bundled Python missing")
+            env.pop("RPDISTILL_PYTHON",None)
+            env.pop("PYTHONPATH",None)
+            env.pop("PYTHONHOME",None)
+            env["PATH"]=str(Path(os.environ["SystemRoot"])/"System32")
+            subprocess.run([str(backend),"-I","-m","rpdistill","--db",str(db),"studio-snapshot"],env=env,check=True,timeout=30,capture_output=True)
+            command=[str(exe),"--studio-smoke"]
+            cwd=root
+        result = subprocess.run(command,
+            cwd=cwd, env=env, check=True, timeout=150, capture_output=True,
             text=True, encoding="utf-8", errors="replace")
         print(result.stdout, end="")
         print(result.stderr, end="", file=sys.stderr)
