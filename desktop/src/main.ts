@@ -171,6 +171,7 @@ let win:BrowserWindow|null=null;
 function create(){
   win=new BrowserWindow({width:1672,height:941,useContentSize:true,minWidth:1000,minHeight:650,
     show:!smoke,backgroundColor:"#10141d",title:"RPDistill Studio",
+    titleBarStyle:"hidden",titleBarOverlay:{color:"#101827",symbolColor:"#e8eef9",height:42},
     webPreferences:{preload:join(__dirname,"preload.cjs"),contextIsolation:true,nodeIntegration:false,
       sandbox:true,webSecurity:true,offscreen:smoke,additionalArguments:smoke?["--studio-smoke"]:[]}});
   win.webContents.setWindowOpenHandler(()=>({action:"deny"}));

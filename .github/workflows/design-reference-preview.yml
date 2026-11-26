@@ -8,6 +8,7 @@ on:
       - 'src/rpdistill/**'
       - 'tests/test_studio.py'
       - 'scripts/studio_desktop_smoke.py'
+      - 'scripts/studio_visual_compare.py'
       - 'scripts/studio_live_download_smoke.py'
       - 'tests/test_downloads.py'
       - 'pyproject.toml'
@@ -77,6 +78,14 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - run: python -m pip install Pillow
+      - name: Compare native screenshot with original reference
+        run: python ../scripts/studio_visual_compare.py --reference ../docs/assets/rpdistill-auto-distill-dashboard.png --actual "${{ runner.temp }}/rpdistill-dashboard.png" --output "${{ runner.temp }}/rpdistill-visual-comparison"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-reference-comparison
+          path: ${{ runner.temp }}/rpdistill-visual-comparison
+          if-no-files-found: error
+          retention-days: 7
       - name: Emit screenshot preview for visual review
         env:
           RPDISTILL_SMOKE_SCREENSHOT: ${{ runner.temp }}/rpdistill-dashboard.png
