@@ -1,0 +1,73 @@
+name: Windows NVIDIA GPU acceptance (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      precision:
+        description: 'CUDA precision; run separately for each required precision'
+        type: choice
+        options: [float32, float16, bfloat16]
+        required: true
+        default: float32
+      cuda_budget_bytes:
+        description: 'Approved available CUDA allocated-byte budget (not a hard VRAM cap)'
+        type: string
+        required: true
+      approved:
+        description: 'Authorize dedicated trusted GPU runner, asset downloads and temporary checkpoints'
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+jobs:
+  gpu-acceptance:
+    if: inputs.approved == true && (github.ref == 'refs/heads/feature/e11a-dashboard-visual' || github.ref == 'refs/heads/main')
+    runs-on: [self-hosted, Windows, X64, rpdistill-gpu]
+    timeout-minutes: 45
+    env:
+      CUBLAS_WORKSPACE_CONFIG: ':4096:8'
+      PYTHONUTF8: '1'
+      RPDISTILL_PRECISION: ${{ inputs.precision }}
+      RPDISTILL_CUDA_BUDGET: ${{ inputs.cuda_budget_bytes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify trusted runner and create isolated Python environment
+        shell: pwsh
+        run: |
+          if ($env:RPDISTILL_CUDA_BUDGET -notmatch '^[0-9]{1,13}$') { throw "Invalid budget" }
+          nvidia-smi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $venv = Join-Path $env:RUNNER_TEMP ("rpdistill-gpu-" + [guid]::NewGuid().ToString("N"))
+          python -m venv "$venv"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exe = Join-Path $venv "Scripts/python.exe"
+          "RPDISTILL_GPU_VENV=$venv" >> $env:GITHUB_ENV
+          "RPDISTILL_GPU_PYTHON=$exe" >> $env:GITHUB_ENV
+      - name: Install fixed CUDA 12.8 runtime into isolated environment
+        shell: pwsh
+        run: |
+          & $env:RPDISTILL_GPU_PYTHON -I -m pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cu128
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $env:RPDISTILL_GPU_PYTHON -I -m pip install '.[student]'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Full fixed-profile CUDA queue and cross-process resume
+        shell: pwsh
+        run: |
+          & $env:RPDISTILL_GPU_PYTHON scripts/studio_gpu_acceptance.py --device cuda:0 --precision "$env:RPDISTILL_PRECISION" --cuda-budget-bytes "$env:RPDISTILL_CUDA_BUDGET" --approved --report "$env:RUNNER_TEMP/rpdistill-gpu-${{ github.run_id }}-${{ github.run_attempt }}.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-gpu-acceptance
+          path: ${{ runner.temp }}/rpdistill-gpu-${{ github.run_id }}-${{ github.run_attempt }}.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Remove only the newly created isolated environment
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:RPDISTILL_GPU_VENV -and (Split-Path $env:RPDISTILL_GPU_VENV -Parent) -eq $env:RUNNER_TEMP -and (Split-Path $env:RPDISTILL_GPU_VENV -Leaf) -match '^rpdistill-gpu-[a-f0-9]{32}$') {
+            Remove-Item -LiteralPath $env:RPDISTILL_GPU_VENV -Recurse -Force
+          }

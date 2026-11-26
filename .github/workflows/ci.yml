@@ -68,6 +68,27 @@ jobs:
       - run: python scripts/resume_smoke.py
       - run: python scripts/training_queue_smoke.py
       - run: python scripts/student_evaluation_smoke.py
+      - name: GPU acceptance must fail closed on CPU-only runtime
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys, tempfile
+          from pathlib import Path
+          import torch
+          assert not torch.cuda.is_available()
+          with tempfile.TemporaryDirectory() as tmp:
+              p=Path(tmp)/"gpu-report.json"
+              args=[sys.executable,"scripts/studio_gpu_acceptance.py","--device","cuda:0",
+                    "--precision","float32","--cuda-budget-bytes",str(6*1024**3),"--report",str(p)]
+              result=subprocess.run(args,capture_output=True,timeout=30)
+              assert result.returncode!=0 and not p.exists(),"missing approval accepted"
+              result=subprocess.run(args+["--approved"],capture_output=True,timeout=60)
+              assert result.returncode!=0,"CPU-only runtime accepted as GPU"
+              report=json.loads(p.read_text(encoding="utf-8"))
+              assert report["local_gpu_smoke_pass"] is False and report["real_cuda_tensor"] is False
+              assert report["release_ready"] is False and report["error"]=="ValueError"
+              assert "tokenizer" not in report,"asset download before CUDA preflight"
+              print("gpu_unavailable_rejected=true; actual_gpu_acceptance=false")
+          PY
 
   real-evaluation:
     timeout-minutes: 10
