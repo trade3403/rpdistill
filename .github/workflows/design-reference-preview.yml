@@ -20,6 +20,8 @@ on:
       - 'scripts/studio_visual_compare.py'
       - 'scripts/studio_live_download_smoke.py'
       - 'scripts/studio_live_teacher_smoke.py'
+      - 'scripts/studio_live_pmc_teacher_smoke.py'
+      - 'tests/test_corpus.py'
       - 'tests/test_downloads.py'
       - 'pyproject.toml'
       - 'docs/assets/**'
@@ -229,5 +231,29 @@ jobs:
         with:
           name: windows-live-pretrained-teacher-report
           path: ${{ runner.temp }}/rpdistill-live-teacher.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  windows-live-pmc-teacher:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+      - run: python -m pip install 'torch==2.7.1' --index-url https://download.pytorch.org/whl/cpu
+      - run: python -m pip install -e '.[hub,inference]'
+      - name: Real PMC discovery, full text, pretrained teacher and candidate snapshot
+        run: python scripts/studio_live_pmc_teacher_smoke.py --report "${{ runner.temp }}/rpdistill-live-pmc-teacher.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-live-pmc-teacher-report
+          path: ${{ runner.temp }}/rpdistill-live-pmc-teacher.json
           if-no-files-found: warn
           retention-days: 7

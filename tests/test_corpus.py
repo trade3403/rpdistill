@@ -100,3 +100,26 @@ class CorpusTests(unittest.TestCase):
     def test_paper_split_stable(self):
         self.assertEqual(stable_split("PMC123"),stable_split("PMC123"))
         self.assertIn(stable_split("PMC123"),("train","validation","test"))
+
+    def test_bounded_translation_spreads_across_papers(self):
+        # An earlier paper with multiple segments must not consume the whole budget.
+        raw=self.raw.replace(b"</body>",b"<p>A second independent laboratory observation was recorded with a calibrated instrument.</p></body>")
+        self.register(raw)
+        doi="10.1234/second"
+        self.catalog.ingest(paper_from_record(dict(source="MED",id="999",title="Second article",
+            authorString="Example Author",doi=doi,pmcid="PMC999",isOpenAccess="Y",license="cc by")))
+        other=xml(pmcid="PMC999",doi=doi).replace(b"<p>Example</p>",b"<p>A different experimental observation was recorded using a calibrated instrument.</p>")
+        import sqlite3
+        from contextlib import closing
+        dest=self.library.path_for("PMC999")
+        dest.write_bytes(other)
+        with closing(sqlite3.connect(self.db)) as db,db:
+            self.library.save(db,dict(pmcid="PMC999",doi=doi,status="downloaded_pending_content_review",
+                path=str(dest),size=len(other),sha256=hashlib.sha256(other).hexdigest(),
+                license_uri="https://creativecommons.org/licenses/by/4.0/",datestamp="2025-01-01"))
+        self.assertEqual(self.store.parse(self.library.root)["segments"],3)
+        stats=self.store.translate(self.translator(),limit=2)
+        self.assertEqual(stats["generated"],2)
+        with closing(self.store.connect()) as db:
+            papers={json.loads(row[0])["pmcid"] for row in db.execute("SELECT record FROM corpus_pairs")}
+        self.assertEqual(papers,{"PMC123","PMC999"})

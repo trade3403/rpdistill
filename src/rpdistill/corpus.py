@@ -271,7 +271,7 @@ class CorpusStore:
                 WHERE json_extract(p.record,'$.eligibility')='pending_fulltext_license'
                 AND json_extract(f.record,'$.status')='downloaded_pending_content_review'
                 AND json_extract(f.record,'$.sha256')=json_extract(s.record,'$.attribution.xml_sha256')
-                ORDER BY s.pmcid,s.id""")
+                ORDER BY row_number() OVER (PARTITION BY s.pmcid ORDER BY s.id),s.pmcid,s.id""")
             pending = []
             for row in rows:
                 segment = json.loads(row[0])
