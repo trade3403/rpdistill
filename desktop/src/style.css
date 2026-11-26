@@ -63,3 +63,51 @@ h1{font-size:24px}.hero{padding:16px 18px;margin-bottom:12px;background:linear-g
 .shell main>header{padding-right:145px;-webkit-app-region:drag}.shell main>header button{-webkit-app-region:no-drag}.shell aside .brand{-webkit-app-region:drag}
 
 .quality-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:8px;margin:6px 0}.quality-cell{min-width:0;background:#101a2b;border:1px solid #2d4058;border-radius:6px;padding:9px;display:grid;gap:5px}.quality-cell b{font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.quality-cell .quality-pass{color:#6cdaa7}.quality-cell .quality-fail{color:#ff9a92}.quality-comparison th,.quality-comparison td{white-space:normal;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+
+/* E12e1 reference-aligned dashboard, actual status and authorizations retained. */
+.studio-brand>svg{filter:drop-shadow(0 3px 6px #29175d80)}
+.studio-workflow span{font-weight:500}
+.studio-status.running{background:#10261f;border-color:#23553d}
+.studio-dashboard .flow-panel h2 svg{color:#6de4c7}
+.studio-dashboard .studio-gpu h2 svg{color:#8fe150}
+.studio-dashboard .studio-metrics .metric:last-child svg{color:#f7d66b}
+.studio-dashboard .studio-metrics .metric{background:linear-gradient(140deg,#1c2943,#142034);box-shadow:inset 0 0 0 1px #34435b44}
+.studio-dashboard .panel,.studio-config{box-shadow:inset 0 1px 1px #7387ba17}
+.flow-stage.done{background:linear-gradient(140deg,#0c6048,#104b3a);box-shadow:inset 0 0 10px #51d9a014}
+.flow-stage.active{background:linear-gradient(140deg,#5633b9,#342780);box-shadow:inset 0 0 12px #c29bff30,0 0 11px #7238b766}
+.flow-stage.done svg{color:#a1f9e2}.flow-stage.active svg{color:#ede5ff}
+.studio-config .strategy-links{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0}
+.studio-config .strategy-links .config-link{min-width:0;padding:5px 2px;font-size:11px}
+.studio-config .config-approve{padding:6px 7px;border:1px solid #3a597f;border-radius:5px;background:#14253c;line-height:1.3;color:#d8e5f8}
+.studio-config .config-approve input{flex:none}
+.studio-config .config-hint{margin:4px 0}
+.studio-config .source-grid label{white-space:nowrap;font-size:11px}
+.studio-config .source-grid input{flex:none}
+.studio-config .strategy-grid label{font-size:11px}
+.studio-config .config-actions>button{min-height:48px}
+.studio-config .config-content{scrollbar-width:thin;scrollbar-color:#5c6c83 #182235}
+.studio-config .config-content:focus-within{scrollbar-color:#8194ae #182235}
+.studio-footer .footer-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:currentColor;margin-right:5px}
+.studio-footer .running .footer-dot{box-shadow:0 0 7px #32e58c66}
+.studio-logs .log-body{background:linear-gradient(120deg,#121c2d,#101827);border-radius:0 0 11px 11px}
+.studio-dashboard .loss-svg{width:100%;height:146px}
+.studio-dashboard .loss-panel .chart-placeholder{background:#101827}
+@media(min-width:1551px) and (min-height:850px){
+ .studio-shell{grid-template-columns:202px minmax(0,1fr) 410px}
+ .studio-top{padding-left:18px;padding-right:145px;gap:16px}
+ .studio-brand{min-width:432px;gap:16px}
+ .studio-workflow{gap:8px}.studio-workflow span{font-size:14px;gap:7px}
+ .studio-nav{padding-top:14px;gap:7px}
+ .studio-dashboard{grid-template-rows:188px 114px 255px minmax(160px,1fr);padding:12px 13px 12px 15px}
+ .studio-pipeline{gap:21px;padding:10px 19px 12px}
+ .flow-stage:not(:last-child):after{right:-21px}
+ .studio-config h2{margin-bottom:4px}
+ .studio-config .config-line{margin:3px 0;min-height:28px}
+ .studio-config input:not([type=checkbox]),.studio-config select{height:28px}
+ .studio-config .config-mode button,.studio-config .config-link{padding:4px 5px}
+ .studio-config h3{margin:9px 0 4px}
+ .studio-config .source-grid{gap:4px}
+ .studio-config .strategy-grid{gap:5px}
+ .studio-config .config-approve{margin-top:5px}
+}
+@media(max-width:1150px){.studio-config .source-grid label{white-space:normal}.studio-config .config-actions>button{min-height:36px}}
