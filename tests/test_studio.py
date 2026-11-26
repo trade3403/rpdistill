@@ -61,3 +61,31 @@ class StudioTests(unittest.TestCase):
             self.assertIsNone(r["rows"]["downloads"][0]["network_bytes"])
             self.assertIsNone(r["rows"]["downloads"][0]["network_rate"])
             self.assertEqual(p.read_bytes(),before)
+
+    @patch("rpdistill.studio.device_report",return_value={})
+    def test_corpus_snapshot_bounded_and_read_only(self,_):
+        import json
+        from rpdistill.pipeline import CorpusPipeline
+        from rpdistill.papers import PaperCatalog
+        from rpdistill.datasets import DatasetStore
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/"db.sqlite3"
+            CorpusPipeline(p)
+            PaperCatalog(p)
+            DatasetStore(p)
+            with closing(sqlite3.connect(p)) as db, db:
+                db.execute("INSERT INTO corpus_runs VALUES (?,?,'running',2,?,NULL,?)",
+                    ("a"*32,json.dumps({"model_id":"fixture/model","query":{"keywords":["biology"]},"max_bytes":1024,"paper_limit":2}),"{}","2026-01-01"))
+                db.execute("INSERT INTO papers(doi,pmcid,record) VALUES (?,?,?)",
+                    ("10.1234/test","PMC123",json.dumps({"title":"fixture title","eligibility":"pending_fulltext_license"})))
+                db.execute("INSERT INTO dataset_versions VALUES (?,?)",("b"*64,json.dumps({"counts":{"train":10,"validation":1,"test":1},"status":"candidate_snapshot","teacher":{"model_id":"fixture/model"}})))
+            before=p.read_bytes()
+            r=snapshot(p)
+            self.assertEqual(r["counts"]["pipeline_active"],1)
+            self.assertEqual(r["rows"]["pipelines"][0]["keyword"],"biology")
+            self.assertEqual(r["rows"]["papers"][0]["title"],"fixture title")
+            self.assertEqual(r["rows"]["datasets"][0]["train"],10)
+            self.assertNotIn("spec",r["rows"]["pipelines"][0])
+            self.assertNotIn("manifest",r["rows"]["datasets"][0])
+            self.assertEqual(p.read_bytes(),before)

@@ -42,6 +42,27 @@ function query():Promise<Reply>{
 // Only explicitly started, approved persistent jobs run. A worker never kills an active
 // download on pause/stop: cooperative checkpoints and DB state remain authoritative.
 const worker:WorkerStatus={running:false,stop_requested:false,message:"下载执行器未启动"};
+const corpusWorker:{running:boolean;id:string|null;message:string}={running:false,id:null,message:"语料执行器未启动"};
+function startCorpus(id:string):ModelReply{
+ if(worker.running||corpusWorker.running||modelPending)return {ok:false,error:"本地已有执行器或短操作正在运行"};
+ corpusWorker.running=true;corpusWorker.id=id;corpusWorker.message="正在执行单次语料流水线";
+ const child=spawn(python,["-m","rpdistill","--db",db,"pipeline-run",id],{
+  shell:false,windowsHide:true,stdio:["ignore","pipe","pipe"],env:{...process.env,PYTHONIOENCODING:"utf-8"}});
+ const chunks:Buffer[]=[];let size=0,failed=false;
+ child.stdout.on("data",(chunk:Buffer)=>{size+=chunk.length;if(size<=1024*1024)chunks.push(chunk);else failed=true});
+ child.stderr.resume();
+ child.on("error",()=>{failed=true});
+ child.on("close",code=>{
+  corpusWorker.running=false;
+  if(code!==0||failed){corpusWorker.message="语料执行器退出异常，请核对持久任务状态";return}
+  try{
+   const result=JSON.parse(Buffer.concat(chunks).toString("utf8")) as {state?:string};
+   corpusWorker.message=result.state==="candidate_complete"?"候选数据集已生成，仍需人工权利与质量复核":
+    result.state==="insufficient_candidates"?"候选数量不足，未通过数据门槛":"语料任务结束，请核对持久状态";
+  }catch{corpusWorker.message="语料响应无效，请核对持久状态"}
+ });
+ return {ok:true,data:{...corpusWorker}};
+}
 function finishWorker(message:string){
  worker.running=false;worker.stop_requested=false;worker.message=message;
 }
@@ -68,7 +89,7 @@ function nextDownload(){
 }
 function workerAction(kind:string):ModelReply{
  if(kind==="worker-start"){
-  if(worker.running)return {ok:false,error:"本地下载执行器已运行"};
+  if(worker.running||corpusWorker.running)return {ok:false,error:"本地已有下载或语料执行器运行"};
   worker.running=true;worker.stop_requested=false;worker.message="正在启动执行器";
   setImmediate(nextDownload);
   return {ok:true,data:{...worker}};
@@ -82,6 +103,8 @@ function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
  if(args[0]==="worker-start"||args[0]==="worker-stop")return Promise.resolve(workerAction(args[0]));
+ if(args[0]==="pipeline-run")return Promise.resolve(startCorpus(args[1]));
+ if(args[0]==="pipeline-resume"&&corpusWorker.running)return Promise.resolve({ok:false,error:"本地语料执行器仍在运行"});
  if(args[0]==="download-recover"&&worker.running)return Promise.resolve({ok:false,error:"本地执行器仍在运行，不能恢复"});
  if(modelPending)return Promise.resolve({ok:false,error:"已有模型操作正在执行"});
  modelPending=true;
@@ -112,7 +135,7 @@ function create(){
   win.webContents.on("will-navigate",(e,url)=>{if(url!==allowedURL)e.preventDefault()});
   win.webContents.on("will-attach-webview",e=>e.preventDefault());
   win.on("close",event=>{
-    if(worker.running){event.preventDefault();dialog.showMessageBoxSync(win!,{type:"info",title:"下载执行器仍在运行",message:"请先暂停或取消当前任务，或等待当前任务结束，再关闭窗口。"});}
+    if(worker.running||corpusWorker.running){event.preventDefault();dialog.showMessageBoxSync(win!,{type:"info",title:"执行器仍在运行",message:"请等待当前语料任务完成，或先暂停/取消下载任务，再关闭窗口。"});}
   });
   win.on("closed",()=>{win=null});
   void win.loadFile(page);
@@ -124,7 +147,7 @@ app.whenReady().then(()=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
        event.senderFrame!==win.webContents.mainFrame)return {ok:false,error:"请求来源无效"} satisfies Reply;
     const reply=await query();
-    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker}}}:reply;
+    return reply.ok?{ok:true,data:{...reply.data,local_worker:{...worker},local_corpus_worker:{...corpusWorker}}}:reply;
   });
   ipcMain.handle("studio:model-action",(event,request:unknown)=>{
     if(!win||event.sender!==win.webContents||event.senderFrame?.url!==allowedURL||
@@ -153,5 +176,5 @@ app.whenReady().then(()=>{
   create();
   app.on("activate",()=>{if(!win)create()});
 });
-app.on("before-quit",event=>{if(worker.running){event.preventDefault();if(win)dialog.showMessageBoxSync(win,{type:"info",message:"下载执行器仍在运行，请先结束当前任务。"});}});
+app.on("before-quit",event=>{if(worker.running||corpusWorker.running){event.preventDefault();if(win)dialog.showMessageBoxSync(win,{type:"info",message:"执行器仍在运行，请先结束当前任务。"});}});
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit()});

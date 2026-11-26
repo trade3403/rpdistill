@@ -20,8 +20,23 @@ QUERIES={
         FROM model_download_jobs ORDER BY updated DESC,id LIMIT 50""",
     "training":"""SELECT id,state,step,attempt,reserved_seconds,reserved_bytes,
         substr(error,1,200) AS error,updated FROM training_jobs ORDER BY updated DESC,id LIMIT 50""",
-    "pipelines":"""SELECT id,state,stage,substr(error,1,200) AS error,updated
+    "pipelines":"""SELECT id,state,stage,substr(error,1,200) AS error,updated,
+        substr(json_extract(spec,'$.model_id'),1,200) AS model_id,
+        substr(json_extract(spec,'$.query.keywords[0]'),1,200) AS keyword,
+        json_extract(spec,'$.max_bytes') AS max_bytes,
+        json_extract(spec,'$.paper_limit') AS paper_limit,
+        json_extract(results,'$.snapshot.version') AS dataset_version
         FROM corpus_runs ORDER BY updated DESC,id LIMIT 50""",
+    "papers":"""SELECT paper_id AS id,pmcid,substr(json_extract(record,'$.title'),1,300) AS title,
+        substr(json_extract(record,'$.publication_date'),1,20) AS publication_date,
+        substr(json_extract(record,'$.eligibility'),1,80) AS eligibility
+        FROM papers ORDER BY paper_id DESC LIMIT 50""",
+    "datasets":"""SELECT version,json_extract(manifest,'$.counts.train') AS train,
+        json_extract(manifest,'$.counts.validation') AS validation,
+        json_extract(manifest,'$.counts.test') AS test,
+        substr(json_extract(manifest,'$.teacher.model_id'),1,200) AS model_id,
+        substr(json_extract(manifest,'$.status'),1,80) AS status
+        FROM dataset_versions ORDER BY version LIMIT 50""",
 }
 TEACHER_SQL="""SELECT substr(model_id,1,200) AS model_id,revision,
     substr(json_extract(record,'$.license'),1,100) AS license FROM {table}
@@ -31,7 +46,7 @@ TEACHER_SQL="""SELECT substr(model_id,1,200) AS model_id,revision,
 def snapshot(db_path):
     path=Path(db_path).expanduser().resolve()
     counts={key:0 for key in TABLES}
-    counts.update(download_queued=0,download_active=0)
+    counts.update(download_queued=0,download_active=0,pipeline_active=0)
     rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers")}
     exists=path.exists()
     if exists:
@@ -50,6 +65,8 @@ def snapshot(db_path):
             if TABLES["downloads"] in available:
                 counts["download_queued"]=db.execute("SELECT count(*) FROM model_download_jobs WHERE state='queued'").fetchone()[0]
                 counts["download_active"]=db.execute("SELECT count(*) FROM model_download_jobs WHERE state IN ('running','pause_requested','cancel_requested')").fetchone()[0]
+            if TABLES["pipelines"] in available:
+                counts["pipeline_active"]=db.execute("SELECT count(*) FROM corpus_runs WHERE state='running'").fetchone()[0]
             for key,sql in QUERIES.items():
                 if TABLES[key] in available:
                     if key=="downloads":

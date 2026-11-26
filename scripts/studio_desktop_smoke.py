@@ -26,6 +26,9 @@ def main():
             "download-enqueue", "fixture/model", "--revision", "a" * 40,
             "--reviewed-license", "apache-2.0", "--max-bytes", "1024",
             "--cache-dir", str(root / "cache")], env=env, check=True, timeout=30)
+        # Isolated registry fixture for pipeline creation only; never load its weights.
+        from rpdistill.teachers import TeacherRegistry, Teacher
+        TeacherRegistry(db).put(Teacher("fixture/model", "a" * 40, "apache-2.0", False, False, None), root / "cache", [])
         result = subprocess.run(["node", str(cli), ".", "--studio-smoke"],
             cwd=desktop, env=env, check=True, timeout=120, capture_output=True,
             text=True, encoding="utf-8", errors="replace")
