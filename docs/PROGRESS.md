@@ -270,3 +270,7 @@ ca1760b 标准 CI 45746734363 为6/10 success，四个 macOS/Windows Python 3.11
 
 ## E11d3a Windows x64 安装候选（开发分支，待 CI）
 前置8fd6d57标准45772434850、专项45772434894 success。新增 electron-builder 26.0.12 NSIS 当前用户安装，目录可选、桌面/开始菜单快捷方式、卸载保留应用数据，明确禁止自动发布；未签名候选。构建从可信 Windows x64 setup-python 3.11 runtime 分离复制 Python EXE/DLL/标准库及许可证、安装本仓库基础包到隔离 packages，._pth 限定导入路径，不包含 pip/第三方 ML依赖或权重，安装版默认绝对路径内置后端，RPDISTILL_PYTHON可信覆盖保留。设置页显示可选依赖发现。新增分支及未来 main 的 Windows installer CI：实际生成NSIS EXE、静默安装、检查快捷方式、隔离PATH且无外部Python覆盖的真实Electron IPC smoke、卸载及外部测试数据保留检查，上传EXE和SHA-256验收JSON（7天）。不宣称安装已通过，待本次CI；不含CUDA/PyTorch/教师SDK/评测依赖/Rust桥接，使用可信外部Python环境，图形化依赖部署、升级/真实用户安装、代码签名/传递依赖锁定及GPU完整流程后续验收。Windows GUI only，Europe PMC暂缓，D线只读，未合并main。
+
+
+## E11d3b1 独立训练环境部署（开发分支，待 CI）
+前置11f5cd5标准45775088310、专项45775088292全通过；安装验收 job139756704221实际EXE 106190202字节 SHA256 fa6be9d9fe78156f7a3a23855ece0e99666b3256cf56ba9f0d529046619cc820，安装/快捷方式/隔离PATH内置后端/卸载/外部数据均通过，未签名候选。新增设置页固定 CPU 或 CUDA12.8 PyTorch2.7.1，预装可信Win x64 Python3.11/3.12后通过原生选择及再次确认；独立新venv、12/25GiB空闲空间预检（非硬配额）、固定官方torch索引/PyPI二进制依赖、隔离pip/Python环境，逐阶段状态；pip check、真实CPU张量/选CUDA则真实CUDA张量、全部SDK导入及后端快照校验后写 verified.json，绑定安装包精确wheel SHA256。主进程原子登记active.json，后续启动恢复验证过的独立环境，版本/wheel变更回退基础，外部RPDISTILL_PYTHON优先且禁止部署；失败不替换旧环境、保留未完成目录供人工核对，正常关闭保护、本地执行器互斥。新增Windows专项实际CPU联网部署（无GUI点击/激活验收）及拒绝无授权/路径注入测试。尚未通过新CI；用户需预装Python，不自动安装系统Python；CUDA实际硬件/GUI完整部署/升级和回滚、硬预算/依赖锁定/签名仍待后续。E11d3b2完善环境切换、修复及安装体验，后续E12真实GPU/人审全链路。Windows GUI only，Europe PMC暂缓，D线只读，未合并main。

@@ -10,6 +10,7 @@ on:
       - 'tests/test_studio_evaluation.py'
       - 'tests/test_studio_artifacts.py'
       - 'tests/test_studio_reviews.py'
+      - 'tests/test_studio_environment.py'
       - 'scripts/studio_desktop_smoke.py'
       - 'scripts/studio_prepare_windows_backend.py'
       - 'scripts/studio_installer_smoke.py'
@@ -151,3 +152,31 @@ jobs:
             ${{ runner.temp }}/rpdistill-installer-report.json
           if-no-files-found: error
           retention-days: 7
+
+  windows-managed-cpu-environment:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+      - name: Stage exact offline backend and wheel
+        run: python scripts/studio_prepare_windows_backend.py --output desktop/build/backend
+      - name: Deploy real CPU training environment from packaged backend
+        run: |
+          $base = (Get-Command python).Source
+          $wheel = @(Get-ChildItem desktop/build/backend/wheels/rpdistill-*.whl)
+          if ($wheel.Count -ne 1) { throw "Expected exact backend wheel" }
+          $root = Join-Path $env:RUNNER_TEMP "rpdistill-managed-ci"
+          & desktop/build/backend/python.exe -I -m rpdistill.studio_environment --python "$base" --wheel "$($wheel[0].FullName)" --root "$root" --profile cpu --approved
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $receipt = @(Get-ChildItem "$root/*/verified.json")
+          if ($receipt.Count -ne 1) { throw "Expected one verified environment" }
+          $r = Get-Content $receipt[0].FullName -Raw | ConvertFrom-Json
+          if (!$r.runtime_verified -or $r.profile -ne "cpu" -or $r.wheel_sha256 -ne (Get-FileHash $wheel[0].FullName -Algorithm SHA256).Hash) { throw "Invalid receipt" }
+          Get-Content $receipt[0].FullName
+          $exe = Join-Path $receipt[0].DirectoryName "Scripts/python.exe"
+          & $exe -I -m rpdistill --db "$root/probe.sqlite3" studio-snapshot
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

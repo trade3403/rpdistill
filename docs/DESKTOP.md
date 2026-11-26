@@ -90,3 +90,7 @@ ca1760b 标准 CI 45746734363 为6/10 success，四个 macOS/Windows Python 3.11
 
 ### 安装候选与完整训练环境
 仅在新安装器CI通过后，从对应 run artifact `windows-x64-unsigned-installer-candidate` 获取EXE并核对report SHA-256；这是未签名的本地开发候选，不是正式发行。内置后端可离线查看/管理本地基础记录，不能直接进行完整模型下载、训练或评测。完整环境：安装可信64位Python 3.11/3.12，创建独立venv，按硬件从可信渠道安装合适的 PyTorch CPU/CUDA，再从本仓库对应提交安装 `python -m pip install ".[hub,modelscope,student,evaluation]"`；启动前在PowerShell设置 `$env:RPDISTILL_PYTHON = 'C:\\path\\to\\venv\\Scripts\\python.exe'`（替换真实路径），启动已安装 EXE。Rust诊断另需可信本地构建的桥接程序并设置 RPDISTILL_RUST_BRIDGE。数据库及模型等默认位于用户 home/.rpdistill，不与程序安装目录混放；卸载不会主动清理这些数据。请自行备份重要资料。未验收升级迁移/完整环境一键部署。
+
+
+## E11d3b1 独立训练环境部署（开发分支，待 CI）
+前置11f5cd5标准45775088310、专项45775088292全通过；安装验收 job139756704221实际EXE 106190202字节 SHA256 fa6be9d9fe78156f7a3a23855ece0e99666b3256cf56ba9f0d529046619cc820，安装/快捷方式/隔离PATH内置后端/卸载/外部数据均通过，未签名候选。新增设置页固定 CPU 或 CUDA12.8 PyTorch2.7.1，预装可信Win x64 Python3.11/3.12后通过原生选择及再次确认；独立新venv、12/25GiB空闲空间预检（非硬配额）、固定官方torch索引/PyPI二进制依赖、隔离pip/Python环境，逐阶段状态；pip check、真实CPU张量/选CUDA则真实CUDA张量、全部SDK导入及后端快照校验后写 verified.json，绑定安装包精确wheel SHA256。主进程原子登记active.json，后续启动恢复验证过的独立环境，版本/wheel变更回退基础，外部RPDISTILL_PYTHON优先且禁止部署；失败不替换旧环境、保留未完成目录供人工核对，正常关闭保护、本地执行器互斥。新增Windows专项实际CPU联网部署（无GUI点击/激活验收）及拒绝无授权/路径注入测试。尚未通过新CI；用户需预装Python，不自动安装系统Python；CUDA实际硬件/GUI完整部署/升级和回滚、硬预算/依赖锁定/签名仍待后续。E11d3b2完善环境切换、修复及安装体验，后续E12真实GPU/人审全链路。Windows GUI only，Europe PMC暂缓，D线只读，未合并main。

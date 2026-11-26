@@ -29,7 +29,12 @@ def main():
     shutil.copytree(src/"Lib",dest/"Lib",ignore=shutil.ignore_patterns("site-packages","__pycache__","*.pyc","test","tests","ensurepip","idlelib","tkinter"))
     packages=dest/"packages"
     repo=Path(__file__).resolve().parents[1]
-    subprocess.run([sys.executable,"-m","pip","install","--no-deps","--no-compile","--target",str(packages),str(repo)],check=True)
+    wheels=dest/"wheels"
+    subprocess.run([sys.executable,"-m","pip","wheel","--no-deps","--wheel-dir",str(wheels),str(repo)],check=True)
+    wheel=list(wheels.glob("rpdistill-*.whl"))
+    if len(wheel)!=1:
+        raise ValueError("expected one exact backend wheel")
+    subprocess.run([sys.executable,"-m","pip","install","--no-index","--no-deps","--no-compile","--target",str(packages),str(wheel[0])],check=True)
     pth=dest/f"python{sys.version_info.major}{sys.version_info.minor}._pth"
     pth.write_text(".\nLib\nDLLs\npackages\n",encoding="ascii")
     env=dict(__import__("os").environ)
