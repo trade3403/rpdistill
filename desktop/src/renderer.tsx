@@ -98,12 +98,15 @@ function App(){
   let trainFinal=await window.studio.snapshot();
   for(let i=0;i<30&&trainFinal.ok&&trainFinal.data.local_training_worker?.running;i++){await new Promise(resolve=>setTimeout(resolve,250));trainFinal=await window.studio.snapshot()}
   const trainOK=!rejectedTrain.ok&&createdTrain.ok&&trainPaused.ok&&trainResumed.ok&&trainCancelled.ok&&!deniedTrainStart.ok&&trainStarted.ok&&trainFinal.ok&&trainFinal.data.local_training_worker?.running===false&&trainFinal.data.local_training_worker.message==="没有待训练任务"&&trainFinal.data.rows.training[0]?.state==="cancelled";
-  (window as any).studioSmoke(trainOK&&corpusOK&&ok&&!invalid.ok&&!unapproved.ok&&paused.ok&&p.ok&&p.data.rows.downloads[0]?.state==="paused"&&resumed.ok&&enqueued.ok&&queueOK&&removed&&!badStart.ok&&started.ok&&!duplicate.ok&&final.ok&&final.data.local_worker?.running===false&&final.data.local_worker.message==="没有待下载任务"&&final.data.counts.download_queued===0&&final.data.rows.downloads.every(r=>r.state==="cancelled"));
+  const deniedAssets=await window.studio.modelAction({kind:"student-assets",approved:false});
+  const injectedAssets=await window.studio.modelAction({kind:"student-assets",approved:true,root:"C:/unexpected"} as any);
+  const assetsOK=!deniedAssets.ok&&!injectedAssets.ok&&trainFinal.ok&&trainFinal.data.student_resources?.state==="missing"&&trainFinal.data.student_resources.file_count===5&&trainFinal.data.local_asset_worker?.running===false;
+  (window as any).studioSmoke(assetsOK&&trainOK&&corpusOK&&ok&&!invalid.ok&&!unapproved.ok&&paused.ok&&p.ok&&p.data.rows.downloads[0]?.state==="paused"&&resumed.ok&&enqueued.ok&&queueOK&&removed&&!badStart.ok&&started.ok&&!duplicate.ok&&final.ok&&final.data.local_worker?.running===false&&final.data.local_worker.message==="没有待下载任务"&&final.data.counts.download_queued===0&&final.data.rows.downloads.every(r=>r.state==="cancelled"));
  }catch{(window as any).studioSmoke(false)}})();
  }},[data]);
  return <div className={tab===0?"shell dashboard-shell":"shell"}><aside><div className="brand"><span className="logo">RP</span><div>RPDistill<span>STUDIO · 知识蒸馏</span></div></div>
  <div className="navlabel">工作空间</div>{tabs.map((t,i)=><button className={tab===i?"nav active":"nav"} onClick={()=>setTab(i)} key={t}><span>{["◈","▣","▤","◉","◇"][i]}</span>{t}</button>)}
- <div className="aside-bottom">本地工作空间<br/><small>本地工作台 · E11c3a</small></div></aside>
+ <div className="aside-bottom">本地工作空间<br/><small>本地工作台 · E11c3b</small></div></aside>
  <main><header><div><div className="eyebrow">RPTRANSLATE / 自主模型训练</div><h1>{tabs[tab]}</h1></div><div className="header-actions"><span className={error?"status bad":"status"}>{error?"连接异常":data?"本地后端已连接":"正在连接"}</span><button className="refresh" onClick={()=>void refresh()} disabled={busy}>{busy?"刷新中…":"刷新状态"}</button></div></header>
  {error&&<div role="alert" className="error">{error}；现有数据显示为上次成功快照。</div>}
  <div className="subline">本地真实记录 · {data?.observed_at?new Date(data.observed_at).toLocaleString():"尚未取得快照"}{data&&!data.database_exists?" · 尚无任务数据库":""}</div>

@@ -3,8 +3,11 @@ from contextlib import closing
 from datetime import datetime,timezone
 from pathlib import Path
 import sqlite3
+import os
+import shutil
+from importlib.util import find_spec
 from .resumable import required_bytes
-from .student import FIXED
+from .student import FIXED, ASSETS, BASE_SOURCE, BASE_REVISION, checked_assets
 
 from .devices import device_report
 from . import __version__
@@ -48,6 +51,37 @@ QUERIES={
 TEACHER_SQL="""SELECT substr(model_id,1,200) AS model_id,revision,
     substr(json_extract(record,'$.license'),1,100) AS license FROM {table}
     ORDER BY model_id,revision LIMIT 50"""
+
+
+def student_resources(assets,checkpoint_root):
+    assets=Path(assets).expanduser()
+    state="missing"
+    try:
+        if assets.is_symlink():
+            state="invalid"
+        elif assets.exists():
+            checked_assets(assets)
+            state="verified"
+    except (OSError,ValueError):
+        state="invalid"
+    def free_bytes(path):
+        try:
+            path=Path(path).expanduser().resolve()
+            while not path.exists() and path!=path.parent:
+                path=path.parent
+            return shutil.disk_usage(path).free if path.is_dir() else None
+        except (OSError,RuntimeError,ValueError):
+            return None
+    def present(name):
+        try:
+            return find_spec(name) is not None
+        except (ImportError,ValueError):
+            return False
+    return {"state":state,"source":BASE_SOURCE,"revision":BASE_REVISION,
+            "file_count":len(ASSETS),"asset_bytes":sum(v[0] for v in ASSETS.values()),
+            "assets_free_bytes":free_bytes(assets),"checkpoint_free_bytes":free_bytes(checkpoint_root),
+            "dependencies":{name:present(name) for name in ("torch","transformers","sentencepiece","safetensors")},
+            "runtime_verified":False}
 
 
 def snapshot(db_path):
@@ -118,5 +152,7 @@ def snapshot(db_path):
     while not disk.exists():
         disk=disk.parent
     return {"schema":SCHEMA,"version":__version__,"observed_at":datetime.now(timezone.utc).isoformat(),
-            "database_exists":exists,"checkpoint_min_bytes":required_bytes(FIXED),"counts":counts,"rows":rows,"devices":device_report(disk),
+            "database_exists":exists,"checkpoint_min_bytes":required_bytes(FIXED),
+            "student_resources":student_resources(os.environ.get("RPDISTILL_STUDENT_ASSETS",Path.home()/".rpdistill"/"student-assets"),
+                os.environ.get("RPDISTILL_CHECKPOINT_ROOT",Path.home()/".rpdistill"/"checkpoints")),"counts":counts,"rows":rows,"devices":device_report(disk),
             "read_only":True,"training_metrics_available":bool(rows["training_loss"]),"release_ready":False}

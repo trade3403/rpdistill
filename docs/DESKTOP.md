@@ -51,3 +51,7 @@ ce815be 标准 CI 45740525104 4/10 success，六个跨平台 CPU 矩阵任务失
 
 ## E11c3a 逐步训练遥测与 GPU 监控（开发分支，待 CI）
 E11c2 修复 fd79b35 标准 45741425689、Windows 专项 45741425763 success。实际 optimizer update 完成后向可选 on_step 回调发出真实 loss、单步计算耗时、监督 token 数；训练队列写入按 job/attempt/step 区分的 SQLite 遥测，校验 worker 所有权、连续性、边界及有限数值，checkpoint 原子登记时标记已提交，恢复后隐藏未提交点、下一次 attempt 清理旧未提交记录。不改变 checkpoint history/确定性训练数据；快照只读、仅一个任务最近120点，兼容旧 checkpoint 事件。Windows GUI 3秒轮询，区分未保存黄色点与已保存点，速度和计算 ETA 只在活跃且30秒内采样时显示（不含 checkpoint/加载/等待）；NVIDIA SMI 扩展 GPU利用率/温度/功耗，缺失为 null，旧驱动拒绝扩展字段时退回基础探测。真实微型 CPU smoke 新增逐步遥测与完整训练 loss 对照、保留原逐位相等断言；单元测试覆盖 GPU 不支持及异常恢复隐藏。未通过新 CI，真实 GPU、本机逐步性能开销、学生资产 GUI 下载、原图高保真及自动化联动待后续 E11c3b/c。Windows GUI only，Europe PMC 暂缓，D 线只读。
+
+
+## E11c3b 学生资源下载与训练预检（开发分支，待 CI）
+前置 ba6a99c 标准 45741902280、Windows 专项 45741902265 success。GUI 新增授权固定公开 OPUS-MT 五文件下载，4 MiB 单次预算，复用 revision/hash/续传及缓存校验，不下载权重；专用子进程及本地 worker 互斥、正常退出保护。只读快照核验学生资源哈希、实际资产/检查点目标磁盘可用量及四依赖发现状态（不导入 ML、不证明运行环境），GUI 创建/启动训练前阻止缺资源/依赖/最低检查点空间不足，配置页另检查选择设备空闲显存。后端原有每段数据、资产、设备及预算验证不变；外部进程不属于本地互斥。修复下载启动遗漏训练互斥。新增缺失/损坏/正确哈希测试、原生 IPC 拒绝未经授权和注入路径；Windows 专项实际 CLI 下载并校验固定五文件（GUI 实际联网点击尚未验收）。下一 E11c3c 原图高保真及任务联动，仍须逐项验证真实截图、实际 GPU/自动蒸馏全链路；Windows GUI only，Europe PMC 暂缓，D 线只读。

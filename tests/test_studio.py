@@ -144,3 +144,27 @@ class StudioTests(unittest.TestCase):
             self.assertEqual(p.read_bytes(),before)
             q.recover(j["id"],worker_stopped=True)
             self.assertEqual([v["step"] for v in snapshot(p)["rows"]["training_loss"]],[1])
+
+    def test_student_resources_read_only(self):
+        from rpdistill.studio import student_resources
+        from rpdistill.student import ASSETS
+        import hashlib
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/"assets"
+            checkpoints=Path(tmp)/"checkpoints"
+            r=student_resources(root,checkpoints)
+            self.assertEqual(r["state"],"missing")
+            self.assertEqual(r["file_count"],5)
+            self.assertEqual(r["asset_bytes"],sum(v[0] for v in ASSETS.values()))
+            self.assertFalse(root.exists())
+            self.assertFalse(checkpoints.exists())
+            self.assertGreater(r["checkpoint_free_bytes"],0)
+            self.assertFalse(r["runtime_verified"])
+            root.mkdir()
+            self.assertEqual(student_resources(root,checkpoints)["state"],"invalid")
+            sample={"config.json":(3,hashlib.sha256(b"abc").hexdigest())}
+            (root/"config.json").write_bytes(b"abc")
+            with patch("rpdistill.student.ASSETS",sample),patch("rpdistill.studio.ASSETS",sample):
+                self.assertEqual(student_resources(root,checkpoints)["state"],"verified")
+                (root/"config.json").write_bytes(b"xyz")
+                self.assertEqual(student_resources(root,checkpoints)["state"],"invalid")

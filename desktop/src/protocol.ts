@@ -3,6 +3,8 @@ export interface Row { [key:string]: string | number | null }
 export interface WorkerStatus {running:boolean;stop_requested:boolean;message:string}
 export interface Snapshot {
   checkpoint_min_bytes?:number;
+  student_resources?:{state:"missing"|"invalid"|"verified";source:string;revision:string;file_count:number;asset_bytes:number;assets_free_bytes:number|null;checkpoint_free_bytes:number|null;dependencies:Record<string,boolean>;runtime_verified:false};
+  local_asset_worker?:WorkerStatus;
   local_worker?:WorkerStatus;
   local_training_worker?:WorkerStatus;
   local_corpus_worker?:{running:boolean;id:string|null;message:string};
@@ -25,6 +27,7 @@ export type ModelRequest =
  | {kind:"pipeline-run";id:string;approved:boolean}
  | {kind:"pipeline-resume";id:string;worker_stopped:boolean}
  | {kind:"training-enqueue";version:string;license:string;steps:number;batch_size:number;learning_rate:number;accumulation:number;device:string;precision:string;cuda_bytes:number;segment_steps:number;segment_seconds:number;total_seconds:number;checkpoint_bytes:number;total_checkpoint_bytes:number;approved:boolean}
+ | {kind:"student-assets";approved:boolean}
  | {kind:"training-start";approved:boolean}
  | {kind:"training-pause"|"training-resume"|"training-cancel";id:string}
  | {kind:"training-recover";id:string;worker_stopped:boolean};

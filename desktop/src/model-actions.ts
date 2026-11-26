@@ -9,6 +9,10 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "student-assets":
+  exact(["kind","approved"]);
+  if(r.approved!==true)throw Error("asset approval");
+  return ["student-assets"];
  case "training-enqueue":
   exact(["kind","version","license","steps","batch_size","learning_rate","accumulation","device","precision","cuda_bytes","segment_steps","segment_seconds","total_seconds","checkpoint_bytes","total_checkpoint_bytes","approved"]);
   if(typeof r.version!=="string"||!/^[a-f0-9]{64}$/.test(r.version)||
