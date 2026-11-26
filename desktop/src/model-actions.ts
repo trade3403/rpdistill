@@ -9,6 +9,35 @@ export function modelArgs(value:unknown):string[]{
  const date=(v:unknown):v is string=>typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v);
  const job=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{32}$/.test(v);
  switch(r.kind){
+ case "training-enqueue":
+  exact(["kind","version","license","steps","batch_size","learning_rate","accumulation","device","precision","cuda_bytes","segment_steps","segment_seconds","total_seconds","checkpoint_bytes","total_checkpoint_bytes","approved"]);
+  if(typeof r.version!=="string"||!/^[a-f0-9]{64}$/.test(r.version)||
+   typeof r.license!=="string"||!/^[A-Za-z0-9][A-Za-z0-9_.+-]{0,99}$/.test(r.license)||
+   !integer(r.steps,1,10000)||!integer(r.batch_size,1,64)||!integer(r.accumulation,1,64)||
+   typeof r.learning_rate!=="number"||!Number.isFinite(r.learning_rate)||r.learning_rate<1e-8||r.learning_rate>0.1||
+   typeof r.device!=="string"||!/^(cpu|cuda:[0-9]{1,3})$/.test(r.device)||
+   typeof r.precision!=="string"||!["float32","float16","bfloat16"].includes(r.precision)||
+   !integer(r.cuda_bytes,0,2**40)||(r.device==="cpu"?(r.cuda_bytes!==0||r.precision!=="float32"):r.cuda_bytes===0)||
+   !integer(r.segment_steps,1,10000)||!integer(r.segment_seconds,1,86400)||
+   !integer(r.total_seconds,r.segment_seconds,31536000)||!integer(r.checkpoint_bytes,1,2**40)||
+   !integer(r.total_checkpoint_bytes,r.checkpoint_bytes,2**44)||r.approved!==true)throw Error("training configuration");
+  return ["training-enqueue",r.version,"--reviewed-dataset",r.version,"--reviewed-teacher-license",r.license,
+   "--steps",String(r.steps),"--batch-size",String(r.batch_size),"--learning-rate",String(r.learning_rate),
+   "--accumulation",String(r.accumulation),"--device",r.device,"--precision",r.precision,
+   "--cuda-budget-bytes",String(r.cuda_bytes),"--segment-steps",String(r.segment_steps),"--segment-seconds",String(r.segment_seconds),
+   "--total-seconds",String(r.total_seconds),"--max-checkpoint-bytes",String(r.checkpoint_bytes),"--total-checkpoint-bytes",String(r.total_checkpoint_bytes)];
+ case "training-start":
+  exact(["kind","approved"]);
+  if(r.approved!==true)throw Error("training start");
+  return ["training-run"];
+ case "training-pause":case "training-resume":case "training-cancel":
+  exact(["kind","id"]);
+  if(!job(r.id))throw Error("training job");
+  return [r.kind,r.id];
+ case "training-recover":
+  exact(["kind","id","worker_stopped"]);
+  if(!job(r.id)||r.worker_stopped!==true)throw Error("training recovery");
+  return ["training-recover",r.id,"--worker-stopped"];
  case "pipeline-create":
   exact(["kind","source","model_id","revision","keyword","start_date","end_date","device","dtype","search_limit","paper_limit","segment_limit","max_bytes","approved"]);
   if(!validSource(r.source)||!validId(r.model_id)||(r.source==="modelscope"&&!r.model_id.includes("/"))||

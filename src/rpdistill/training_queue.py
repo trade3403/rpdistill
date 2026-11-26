@@ -8,6 +8,7 @@ from contextlib import closing,contextmanager
 from dataclasses import asdict
 from datetime import datetime,timezone
 import json
+import math
 from pathlib import Path
 import re
 import sqlite3
@@ -240,7 +241,16 @@ class TrainingQueue:
                         "cancelled" if latest["state"]=="cancel_requested" else
                         "paused" if latest["state"]=="pause_requested" or m["stop_reason"]=="cuda_allocation_budget_boundary" else
                         "running")
-                    self.state(db,id,target,step=m["step"],actual_bytes=actual,stop_reason=m["stop_reason"])
+                    # Only publish measured loss from the newly verified, committed checkpoint.
+                    # Older or synthetic checkpoints without a valid history have no telemetry.
+                    history=m.get("history")
+                    last=history[-1] if isinstance(history,list) and history else None
+                    metric={}
+                    if isinstance(last,dict) and last.get("step")==m["step"]:
+                        loss=last.get("loss")
+                        if type(loss) in (int,float) and math.isfinite(loss) and loss>=0:
+                            metric["loss"]=loss
+                    self.state(db,id,target,step=m["step"],actual_bytes=actual,stop_reason=m["stop_reason"],**metric)
                     if target!="running":
                         return self._get(db,id)
             except (Exception,KeyboardInterrupt) as exc:

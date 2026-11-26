@@ -89,3 +89,28 @@ class StudioTests(unittest.TestCase):
             self.assertNotIn("spec",r["rows"]["pipelines"][0])
             self.assertNotIn("manifest",r["rows"]["datasets"][0])
             self.assertEqual(p.read_bytes(),before)
+
+    @patch("rpdistill.studio.device_report",return_value={})
+    def test_training_snapshot_loss_single_job_and_read_only(self,_):
+        from rpdistill.training_queue import TrainingQueue
+        from rpdistill.resumable import required_bytes
+        from rpdistill.student import FIXED
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/"db"
+            q=TrainingQueue(p)
+            j=q.enqueue("c"*64,Path(tmp)/"assets",Path(tmp)/"states",reviewed_dataset="c"*64,
+                reviewed_teacher_license="mit",total_seconds=300,total_checkpoint_bytes=2**30)
+            with q.write() as db:
+                db.execute("UPDATE training_jobs SET step=2,state='running' WHERE id=?",(j["id"],))
+                q.event(db,j["id"],"running",step=1,loss=2.5)
+                q.event(db,j["id"],"running",step=2,loss=1.75)
+                q.event(db,"d"*32,"running",step=2,loss=99)
+            before=p.read_bytes()
+            r=snapshot(p)
+            self.assertEqual(r["counts"]["training_active"],1)
+            self.assertEqual(r["counts"]["checkpoint_min_bytes"],required_bytes(FIXED))
+            self.assertEqual([v["loss"] for v in r["rows"]["training_loss"]],[2.5,1.75])
+            self.assertTrue(r["training_metrics_available"])
+            self.assertNotIn("spec",r["rows"]["training"][0])
+            self.assertEqual(p.read_bytes(),before)

@@ -3,6 +3,8 @@ from contextlib import closing
 from datetime import datetime,timezone
 from pathlib import Path
 import sqlite3
+from .resumable import required_bytes
+from .student import FIXED
 
 from .devices import device_report
 from . import __version__
@@ -19,6 +21,11 @@ QUERIES={
         {network_rate} AS network_rate,substr(error,1,200) AS error,updated
         FROM model_download_jobs ORDER BY updated DESC,id LIMIT 50""",
     "training":"""SELECT id,state,step,attempt,reserved_seconds,reserved_bytes,
+        json_extract(spec,'$.version') AS version,
+        json_extract(spec,'$.config.training.steps') AS target_steps,
+        json_extract(spec,'$.config.device') AS device,
+        json_extract(spec,'$.total_seconds') AS total_seconds,
+        json_extract(spec,'$.total_checkpoint_bytes') AS total_checkpoint_bytes,
         substr(error,1,200) AS error,updated FROM training_jobs ORDER BY updated DESC,id LIMIT 50""",
     "pipelines":"""SELECT id,state,stage,substr(error,1,200) AS error,updated,
         substr(json_extract(spec,'$.model_id'),1,200) AS model_id,
@@ -46,8 +53,8 @@ TEACHER_SQL="""SELECT substr(model_id,1,200) AS model_id,revision,
 def snapshot(db_path):
     path=Path(db_path).expanduser().resolve()
     counts={key:0 for key in TABLES}
-    counts.update(download_queued=0,download_active=0,pipeline_active=0)
-    rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers")}
+    counts.update(download_queued=0,download_active=0,pipeline_active=0,training_queued=0,training_active=0,checkpoint_min_bytes=required_bytes(FIXED))
+    rows={key:[] for key in (*QUERIES,"teachers","modelscope_teachers","training_loss","training_events")}
     exists=path.exists()
     if exists:
         if not path.is_file():
@@ -67,6 +74,21 @@ def snapshot(db_path):
                 counts["download_active"]=db.execute("SELECT count(*) FROM model_download_jobs WHERE state IN ('running','pause_requested','cancel_requested')").fetchone()[0]
             if TABLES["pipelines"] in available:
                 counts["pipeline_active"]=db.execute("SELECT count(*) FROM corpus_runs WHERE state='running'").fetchone()[0]
+            if TABLES["training"] in available:
+                counts["training_queued"]=db.execute("SELECT count(*) FROM training_jobs WHERE state='queued'").fetchone()[0]
+                counts["training_active"]=db.execute("SELECT count(*) FROM training_jobs WHERE state IN ('running','pause_requested','cancel_requested')").fetchone()[0]
+            if "training_events" in available and TABLES["training"] in available:
+                rows["training_events"]=[dict(r) for r in db.execute("""SELECT seq,job_id,state,created,
+                    json_extract(detail,'$.step') AS step,substr(json_extract(detail,'$.error'),1,100) AS error
+                    FROM training_events ORDER BY seq DESC LIMIT 50""")]
+                # One job, bounded recent checkpoint samples. Never blend distinct runs.
+                chosen=db.execute("""SELECT id FROM training_jobs WHERE step>0
+                    ORDER BY CASE WHEN state IN ('running','pause_requested','cancel_requested') THEN 0 ELSE 1 END,updated DESC,id LIMIT 1""").fetchone()
+                if chosen:
+                    rows["training_loss"]=[dict(r) for r in db.execute("""SELECT job_id,
+                        json_extract(detail,'$.step') AS step,json_extract(detail,'$.loss') AS loss
+                        FROM training_events WHERE job_id=? AND json_type(detail,'$.loss') IN ('integer','real')
+                        ORDER BY seq DESC LIMIT 120""",(chosen[0],))][::-1]
             for key,sql in QUERIES.items():
                 if TABLES[key] in available:
                     if key=="downloads":
@@ -81,4 +103,4 @@ def snapshot(db_path):
         disk=disk.parent
     return {"schema":SCHEMA,"version":__version__,"observed_at":datetime.now(timezone.utc).isoformat(),
             "database_exists":exists,"counts":counts,"rows":rows,"devices":device_report(disk),
-            "read_only":True,"training_metrics_available":False,"release_ready":False}
+            "read_only":True,"training_metrics_available":bool(rows["training_loss"]),"release_ready":False}

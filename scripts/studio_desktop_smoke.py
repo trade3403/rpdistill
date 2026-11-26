@@ -21,7 +21,8 @@ def main():
         root = Path(tmp)
         db = root / "studio.sqlite3"
         env = dict(os.environ, RPDISTILL_PYTHON=sys.executable, RPDISTILL_DB=str(db),
-                   PYTHONIOENCODING="utf-8")
+                   PYTHONIOENCODING="utf-8",RPDISTILL_STUDENT_ASSETS=str(root/"assets"),
+                   RPDISTILL_CHECKPOINT_ROOT=str(root/"checkpoints"))
         subprocess.run([sys.executable, "-m", "rpdistill", "--db", str(db),
             "download-enqueue", "fixture/model", "--revision", "a" * 40,
             "--reviewed-license", "apache-2.0", "--max-bytes", "1024",
@@ -30,7 +31,7 @@ def main():
         from rpdistill.teachers import TeacherRegistry, Teacher
         TeacherRegistry(db).put(Teacher("fixture/model", "a" * 40, "apache-2.0", False, False, None), root / "cache", [])
         result = subprocess.run(["node", str(cli), ".", "--studio-smoke"],
-            cwd=desktop, env=env, check=True, timeout=120, capture_output=True,
+            cwd=desktop, env=env, check=True, timeout=150, capture_output=True,
             text=True, encoding="utf-8", errors="replace")
         print(result.stdout, end="")
         print(result.stderr, end="", file=sys.stderr)
