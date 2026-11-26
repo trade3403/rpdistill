@@ -31,3 +31,7 @@ E11b1 3622224 标准 CI 45728566337、Windows 专项 45728566313 均 success。�
 
 ## E11b2 Windows 测试资源释放修复（待 CI）
 73999c1 的标准 CI 45734512520 为 8/10 success；Windows Python 3.11/3.12 两项均在 test_network_metrics_and_legacy_read_only 的临时目录清理时触发 WinError 32，SQLite 测试连接仍打开。sqlite3.Connection 上下文仅提交/回滚事务，不负责 close；两处测试连接改用 contextlib.closing 外层和事务内层，保留网络字段、旧 schema、数据库字节一致性全部断言。应用逻辑及安全边界不变。Windows 专项 45734512461 两项 success；本次扩展专项触发路径以覆盖 Python 后端和 smoke 测试变化，重新验收 exact head 标准及 Windows 专项 CI 后才进入 E11b3。真实联网下载和像素级截图验收仍未完成。
+
+
+## E11b3 真实小模型下载与异常恢复验收（开发分支，待 CI）
+E11b2 修复 26ec3cd 的标准 CI 45736731767 与 Windows 专项 45736731818 success。新增 Windows 联网验收固定模型 optimum-internal-testing/tiny-random-llama（公开 Apache-2.0 随机权重，16 MiB 上限，运行时解析并固定完整 SHA、拒绝许可/大小变化），真实 HTTPS 下载期间测试专用子进程在权重部分文件落盘后故障退出，确认进程退出后显式 recover/resume；记录 Range 206 真续传或 200 安全重下，核验真实 payload 字节、完整 manifest/上游权重 SHA-256 及 SQLite 自动登记。未执行模型权重、无质量结论。GUI 加入显式人工确认异常恢复（本地 worker 运行时拒绝；外部执行器存活须操作者验证，不自动接管），恢复清理陈旧网络速率。Windows smoke 成功时通过主进程 capturePage 保存 PNG artifact 及 JPEG 日志预览，尚未进行实际像素比对，不宣称 1:1。ModelScope 仍沿用文件级恢复/原有搜索及离线测试，真实全权重下载未验证。新 CI 通过后检查日志及截图再进入 E11c，若公共 Hub 网络故障先区分环境与代码。Windows GUI only，原 D 线只读，Europe PMC 暂缓。

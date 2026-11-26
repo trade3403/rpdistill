@@ -3,6 +3,7 @@ import {spawn} from "node:child_process";
 import {join,resolve} from "node:path";
 import {homedir} from "node:os";
 import {pathToFileURL} from "node:url";
+import {writeFile} from "node:fs/promises";
 import {SCHEMA,type Reply,type Snapshot,type ModelReply,type WorkerStatus} from "./protocol";
 import {modelArgs} from "./model-actions";
 const smoke=process.argv.includes("--studio-smoke");
@@ -81,6 +82,7 @@ function modelAction(request:unknown):Promise<ModelReply>{
  let args:string[];
  try{args=modelArgs(request)}catch{return Promise.resolve({ok:false,error:"请求无效：请核对参数、许可证和预算确认"})}
  if(args[0]==="worker-start"||args[0]==="worker-stop")return Promise.resolve(workerAction(args[0]));
+ if(args[0]==="download-recover"&&worker.running)return Promise.resolve({ok:false,error:"本地执行器仍在运行，不能恢复"});
  if(modelPending)return Promise.resolve({ok:false,error:"已有模型操作正在执行"});
  modelPending=true;
  return new Promise<ModelReply>(done=>{
@@ -130,9 +132,20 @@ app.whenReady().then(()=>{
     return modelAction(request);
   });
   if(smoke){
-    ipcMain.handle("studio:smoke-result",(event,value:unknown)=>{
-      if(win&&event.sender===win.webContents&&event.senderFrame?.url===allowedURL){
-        console.log("studio_smoke="+String(value===true));app.exit(value===true?0:1);
+    ipcMain.handle("studio:smoke-result",async(event,value:unknown)=>{
+      if(win&&event.sender===win.webContents&&event.senderFrame?.url===allowedURL&&event.senderFrame===win.webContents.mainFrame){
+        let ok=value===true;
+        const output=process.env.RPDISTILL_SMOKE_SCREENSHOT;
+        if(ok&&output){
+          try{
+            const image=await win.webContents.capturePage();
+            if(image.isEmpty())throw Error("empty screenshot");
+            await writeFile(output,image.toPNG());
+            const size=image.getSize();
+            console.log("studio_screenshot="+size.width+"x"+size.height);
+          }catch{ok=false}
+        }
+        console.log("studio_smoke="+String(ok));app.exit(ok?0:1);
       }
     });
     setTimeout(()=>app.exit(1),90000).unref();

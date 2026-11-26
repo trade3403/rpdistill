@@ -95,10 +95,13 @@ class DownloadTests(unittest.TestCase):
     def test_recovery_requires_confirmation(self):
         job = self.enqueue()
         with self.q._write() as db:
-            db.execute("UPDATE model_download_jobs SET state='running' WHERE id=?", (job["id"],))
+            db.execute("UPDATE model_download_jobs SET state='running',network_rate=50,network_bytes=100 WHERE id=?", (job["id"],))
         with self.assertRaises(ValueError):
             self.q.recover(job["id"])
-        self.assertEqual(self.q.recover(job["id"], worker_stopped=True)["state"], "interrupted")
+        recovered=self.q.recover(job["id"], worker_stopped=True)
+        self.assertEqual(recovered["state"], "interrupted")
+        self.assertIsNone(recovered["network_rate"])
+        self.assertEqual(recovered["network_bytes"],100)
 
     @patch("rpdistill.teachers.time.sleep")
     def test_per_file_download_retry_and_register(self, sleep):

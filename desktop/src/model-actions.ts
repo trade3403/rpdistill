@@ -24,6 +24,10 @@ export function modelArgs(value:unknown):string[]{
  case "worker-start":case "worker-stop":
   exact(["kind"]);
   return [r.kind];
+ case "recover":
+  exact(["kind","id","worker_stopped"]);
+  if(typeof r.id!=="string"||!/^[a-f0-9]{32}$/.test(r.id)||r.worker_stopped!==true)throw Error("recovery");
+  return ["download-recover",r.id,"--worker-stopped"];
  case "pause":case "resume":case "cancel":
   exact(["kind","id"]);
   if(typeof r.id!=="string"||!/^[a-f0-9]{32}$/.test(r.id))throw Error("job");

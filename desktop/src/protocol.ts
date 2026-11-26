@@ -16,7 +16,8 @@ export type ModelRequest =
  | {kind:"revisions";model_id:string}
  | {kind:"enqueue";source:ModelSource;model_id:string;revision:string;license:string;max_bytes:number;reviewed:boolean}
  | {kind:"pause"|"resume"|"cancel";id:string}
- | {kind:"worker-start"|"worker-stop"};
+ | {kind:"worker-start"|"worker-stop"}
+ | {kind:"recover";id:string;worker_stopped:boolean};
 export type ModelReply={ok:true;data:unknown}|{ok:false;error:string};
 export interface StudioAPI {snapshot:()=>Promise<Reply>;modelAction:(request:ModelRequest)=>Promise<ModelReply>}
 declare global {interface Window {studio:StudioAPI}}

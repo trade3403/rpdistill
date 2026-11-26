@@ -121,7 +121,7 @@ class DownloadQueue:
                 raise ValueError("job is not active")
             target = {"running": "interrupted", "pause_requested": "paused",
                       "cancel_requested": "cancelled"}[row["state"]]
-            db.execute("UPDATE model_download_jobs SET state=?,rate=NULL,eta=NULL,updated=? WHERE id=?",
+            db.execute("UPDATE model_download_jobs SET state=?,rate=NULL,eta=NULL,network_rate=NULL,updated=? WHERE id=?",
                        (target, now(), job_id))
             return self._get(db, job_id)
 
