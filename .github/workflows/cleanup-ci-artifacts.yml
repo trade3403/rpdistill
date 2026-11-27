@@ -1,0 +1,75 @@
+name: Clean expired CI artifacts
+on:
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview without deleting'
+        type: boolean
+        default: true
+permissions:
+  actions: write
+  contents: read
+concurrency:
+  group: artifact-cleanup
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - name: Clean completed-run artifacts older than 24 hours
+        shell: python
+        run: |
+          import os, json, urllib.request, urllib.error, datetime, re
+          repo = os.environ['GITHUB_REPOSITORY']
+          base = os.environ['GITHUB_API_URL'] + '/repos/' + repo
+          dry = os.environ.get('DRY_RUN', '').lower() == 'true'
+          cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=24)
+          def api(url, method='GET'):
+              req = urllib.request.Request(url, method=method, headers={
+                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'User-Agent': 'artifact-cleanup'})
+              with urllib.request.urlopen(req, timeout=30) as res:
+                  return json.load(res) if method == 'GET' else None
+          artifacts = []
+          page = 1
+          while True:
+              batch = api(f'{base}/actions/artifacts?per_page=100&page={page}')['artifacts']
+              artifacts.extend(batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+          count = size = failed = 0
+          for a in artifacts:
+              if datetime.datetime.fromisoformat(a['created_at'].replace('Z', '+00:00')) >= cutoff:
+                  continue
+              if re.search(r'(?i)(release|production|deploy|signed|preserve|keep)', a['name']):
+                  continue
+              rid = (a.get('workflow_run') or {}).get('id')
+              if not rid:
+                  continue
+              try:
+                  if api(f'{base}/actions/runs/{rid}').get('status') != 'completed':
+                      continue
+                  if not dry:
+                      api(f"{base}/actions/artifacts/{a['id']}", 'DELETE')
+                  count += 1
+                  size += a.get('size_in_bytes', 0)
+                  print(('Would delete' if dry else 'Deleted'), a['id'], repr(a['name']))
+              except urllib.error.HTTPError as e:
+                  if e.code != 404:
+                      failed += 1
+                      print('API error', e.code, a['id'])
+          summary = f"Dry run: {dry}; {'eligible' if dry else 'deleted'}: {count}; bytes: {size}; failures: {failed}"
+          print(summary)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write(summary + '\n')
+          if failed:
+              raise SystemExit(1)
